@@ -1,0 +1,683 @@
+import React from 'react';
+import { 
+  Box, 
+  Grid, 
+  Typography, 
+  Card, 
+  CardContent, 
+  Avatar, 
+  List, 
+  ListItem, 
+  ListItemAvatar, 
+  ListItemText, 
+  Chip,
+  IconButton,
+  Button,
+  LinearProgress,
+  useTheme
+} from '@mui/material';
+import {
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  MoreVert as MoreVertIcon,
+  CheckCircle as CheckCircleIcon,
+  Schedule as ScheduleIcon,
+  Flag as FlagIcon,
+  Facebook as FacebookIcon,
+  Instagram as InstagramIcon,
+  Twitter as TwitterIcon,
+  YouTube as YouTubeIcon,
+  ArrowForward as ArrowForwardIcon
+} from '@mui/icons-material';
+import { 
+  Chart as ChartJS, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  BarElement,
+  Title, 
+  Tooltip, 
+  Legend, 
+  ArcElement,
+  Filler
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
+
+// Chart.js bileşenlerini kaydet
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  Filler
+);
+
+// Örnek görevler
+const recentTasks = [
+  {
+    id: '1',
+    title: 'Web sitesi SEO optimizasyonu',
+    status: 'yeni',
+    priority: 'yüksek',
+    assigned_to: { name: 'Zeynep Şahin', avatar: 'https://i.pravatar.cc/150?img=10' },
+    due_date: '2025-04-25T00:00:00.000Z',
+  },
+  {
+    id: '2',
+    title: 'Sosyal medya içerik planı',
+    status: 'devam',
+    priority: 'orta',
+    assigned_to: { name: 'Emre Çelik', avatar: 'https://i.pravatar.cc/150?img=12' },
+    due_date: '2025-04-20T00:00:00.000Z',
+  },
+  {
+    id: '3',
+    title: 'Google Ads kampanyası',
+    status: 'devam',
+    priority: 'yüksek',
+    assigned_to: { name: 'Zeynep Şahin', avatar: 'https://i.pravatar.cc/150?img=10' },
+    due_date: '2025-04-22T00:00:00.000Z',
+  }
+];
+
+// Örnek projeler
+const projects = [
+  { name: 'Teknoloji Şirketi Web Sitesi', progress: 75, client: 'TechCorp Ltd.' },
+  { name: 'E-ticaret Sosyal Medya Kampanyası', progress: 45, client: 'ShopNow A.Ş.' },
+  { name: 'Restoran Dijital Pazarlama', progress: 90, client: 'Lezzet Köşesi' },
+  { name: 'Mobilya Mağazası SEO Çalışması', progress: 30, client: 'Konfor Mobilya' },
+];
+
+// Örnek müşteriler
+const clients = [
+  { name: 'TechCorp Ltd.', avatar: 'https://i.pravatar.cc/150?img=50', status: 'active' },
+  { name: 'ShopNow A.Ş.', avatar: 'https://i.pravatar.cc/150?img=51', status: 'active' },
+  { name: 'Lezzet Köşesi', avatar: 'https://i.pravatar.cc/150?img=52', status: 'active' },
+  { name: 'Konfor Mobilya', avatar: 'https://i.pravatar.cc/150?img=53', status: 'pending' },
+  { name: 'Spor Salonu', avatar: 'https://i.pravatar.cc/150?img=54', status: 'active' },
+];
+
+export default function DashboardPage() {
+  const theme = useTheme();
+  
+  // Grafik verileri
+  const taskCompletionData = {
+    labels: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'],
+    datasets: [
+      {
+        label: 'Tamamlanan Görevler',
+        data: [12, 19, 15, 25, 22, 30],
+        backgroundColor: theme.palette.primary.main,
+        borderColor: theme.palette.primary.main,
+      },
+      {
+        label: 'Yeni Görevler',
+        data: [15, 20, 18, 30, 25, 28],
+        backgroundColor: theme.palette.secondary.main,
+        borderColor: theme.palette.secondary.main,
+      },
+    ],
+  };
+  
+  const revenueData = {
+    labels: ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran'],
+    datasets: [
+      {
+        fill: true,
+        label: 'Gelir (₺)',
+        data: [30000, 35000, 40000, 38000, 45000, 50000],
+        borderColor: theme.palette.primary.main,
+        backgroundColor: `${theme.palette.primary.main}20`,
+        tension: 0.4,
+      },
+    ],
+  };
+  
+  const clientDistributionData = {
+    labels: ['E-ticaret', 'Teknoloji', 'Yiyecek & İçecek', 'Sağlık & Spor', 'Mobilya'],
+    datasets: [
+      {
+        label: 'Müşteri Dağılımı',
+        data: [30, 25, 15, 10, 20],
+        backgroundColor: [
+          '#4caf50',
+          '#2196f3',
+          '#ff9800',
+          '#f44336',
+          '#9c27b0',
+        ],
+        borderWidth: 1,
+      },
+    ],
+  };
+  
+  const socialMediaData = {
+    labels: ['Facebook', 'Instagram', 'Twitter', 'YouTube'],
+    datasets: [
+      {
+        label: 'Takipçi Artışı (%)',
+        data: [15, 25, 10, 20],
+        backgroundColor: ['#1877f2', '#e1306c', '#1da1f2', '#ff0000'],
+      },
+    ],
+  };
+  
+  return (
+    <Box sx={{ 
+      flexGrow: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      width: '100%'
+    }}>
+      <Box sx={{ width: '100%', maxWidth: '1400px' }}>
+        <Typography variant="h4" sx={{ mb: 4, fontWeight: 'bold' }}>
+          Dashboard
+        </Typography>
+        
+        <Grid container spacing={4}>
+          {/* Özet Kartlar */}
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              height: '100%', 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s',
+              '&:hover': {
+                transform: 'translateY(-5px)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                    Toplam Görev
+                  </Typography>
+                  <Avatar sx={{ bgcolor: theme.palette.primary.main, width: 48, height: 48 }}>
+                    <CheckCircleIcon fontSize="medium" />
+                  </Avatar>
+                </Box>
+                <Typography variant="h3" component="div" sx={{ mb: 1, fontWeight: 'bold' }}>
+                  125
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <TrendingUpIcon color="success" fontSize="small" sx={{ mr: 0.5 }} />
+                  <Typography variant="body2" color="success.main" sx={{ fontSize: '0.9rem' }}>
+                    +12% geçen aya göre
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              height: '100%', 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s',
+              '&:hover': {
+                transform: 'translateY(-5px)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                    Aktif Projeler
+                  </Typography>
+                  <Avatar sx={{ bgcolor: theme.palette.warning.main, width: 48, height: 48 }}>
+                    <ScheduleIcon fontSize="medium" />
+                  </Avatar>
+                </Box>
+                <Typography variant="h3" component="div" sx={{ mb: 1, fontWeight: 'bold' }}>
+                  18
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <TrendingUpIcon color="success" fontSize="small" sx={{ mr: 0.5 }} />
+                  <Typography variant="body2" color="success.main" sx={{ fontSize: '0.9rem' }}>
+                    +5% geçen aya göre
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              height: '100%', 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s',
+              '&:hover': {
+                transform: 'translateY(-5px)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                    Aktif Müşteriler
+                  </Typography>
+                  <Avatar sx={{ bgcolor: theme.palette.success.main, width: 48, height: 48 }}>
+                    <FlagIcon fontSize="medium" />
+                  </Avatar>
+                </Box>
+                <Typography variant="h3" component="div" sx={{ mb: 1, fontWeight: 'bold' }}>
+                  24
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <TrendingUpIcon color="success" fontSize="small" sx={{ mr: 0.5 }} />
+                  <Typography variant="body2" color="success.main" sx={{ fontSize: '0.9rem' }}>
+                    +8% geçen aya göre
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={3}>
+            <Card sx={{ 
+              height: '100%', 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              transition: 'transform 0.3s',
+              '&:hover': {
+                transform: 'translateY(-5px)'
+              }
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: '1rem' }}>
+                    Aylık Gelir
+                  </Typography>
+                  <Avatar sx={{ bgcolor: theme.palette.info.main, width: 48, height: 48 }}>
+                    <TrendingUpIcon fontSize="medium" />
+                  </Avatar>
+                </Box>
+                <Typography variant="h3" component="div" sx={{ mb: 1, fontWeight: 'bold' }}>
+                  ₺ 52,500
+                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <TrendingDownIcon color="error" fontSize="small" sx={{ mr: 0.5 }} />
+                  <Typography variant="body2" color="error.main" sx={{ fontSize: '0.9rem' }}>
+                    -3% geçen aya göre
+                  </Typography>
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Görev Tamamlama Grafiği */}
+          <Grid item xs={12} md={8}>
+            <Card sx={{ 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              height: '100%'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Görev Tamamlama Analizi
+                  </Typography>
+                  <IconButton size="small">
+                    <MoreVertIcon />
+                  </IconButton>
+                </Box>
+                <Box sx={{ height: 300 }}>
+                  <Bar 
+                    data={taskCompletionData} 
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Müşteri Dağılımı */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              height: '100%'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Müşteri Dağılımı
+                  </Typography>
+                  <IconButton size="small">
+                    <MoreVertIcon />
+                  </IconButton>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+                  <Doughnut 
+                    data={clientDistributionData} 
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: {
+                          position: 'bottom',
+                        }
+                      },
+                      cutout: '70%'
+                    }}
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Gelir Grafiği */}
+          <Grid item xs={12} md={8}>
+            <Card sx={{ 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Gelir Analizi
+                  </Typography>
+                  <IconButton size="small">
+                    <MoreVertIcon />
+                  </IconButton>
+                </Box>
+                <Box sx={{ height: 300 }}>
+                  <Line 
+                    data={revenueData} 
+                    options={{
+                      responsive: true,
+                      plugins: {
+                        legend: {
+                          position: 'top',
+                        },
+                      },
+                      scales: {
+                        y: {
+                          beginAtZero: true
+                        }
+                      }
+                    }}
+                  />
+                </Box>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Son Görevler */}
+          <Grid item xs={12} md={4}>
+            <Card sx={{ 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Son Görevler
+                  </Typography>
+                  <Button 
+                    endIcon={<ArrowForwardIcon />} 
+                    size="small"
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Tümünü Gör
+                  </Button>
+                </Box>
+                <List sx={{ py: 0 }}>
+                  {recentTasks.map((task) => (
+                    <ListItem 
+                      key={task.id} 
+                      sx={{ 
+                        px: 2, 
+                        py: 1.5, 
+                        borderRadius: '12px',
+                        mb: 1,
+                        '&:hover': { 
+                          bgcolor: theme.palette.mode === 'dark' 
+                            ? 'rgba(255,255,255,0.05)' 
+                            : 'rgba(0,0,0,0.02)' 
+                        }
+                      }}
+                    >
+                      <ListItemAvatar>
+                        <Avatar src={task.assigned_to.avatar}>
+                          {task.assigned_to.name.charAt(0)}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={task.title}
+                        secondary={`Bitiş: ${format(new Date(task.due_date), 'dd MMM yyyy', { locale: tr })}`}
+                        primaryTypographyProps={{ fontWeight: 'medium', variant: 'body2' }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                      <Chip 
+                        label={task.status === 'yeni' ? 'Yeni' : task.status === 'devam' ? 'Devam Ediyor' : 'Tamamlandı'} 
+                        size="small"
+                        color={task.status === 'yeni' ? 'primary' : task.status === 'devam' ? 'warning' : 'success'}
+                        sx={{ height: 24, fontSize: '0.7rem' }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Projeler */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Proje Durumları
+                  </Typography>
+                  <Button 
+                    endIcon={<ArrowForwardIcon />} 
+                    size="small"
+                    sx={{ textTransform: 'none' }}
+                  >
+                    Tümünü Gör
+                  </Button>
+                </Box>
+                <List sx={{ py: 0 }}>
+                  {projects.map((project, index) => (
+                    <Box key={index} sx={{ mb: 2.5 }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                        <Typography variant="body2" fontWeight="medium">
+                          {project.name}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {project.progress}%
+                        </Typography>
+                      </Box>
+                      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                        <Box sx={{ flexGrow: 1, mr: 1 }}>
+                          <LinearProgress 
+                            variant="determinate" 
+                            value={project.progress} 
+                            sx={{ 
+                              height: 8, 
+                              borderRadius: 4,
+                              backgroundColor: theme.palette.mode === 'dark' 
+                                ? 'rgba(255,255,255,0.1)' 
+                                : 'rgba(0,0,0,0.05)'
+                            }}
+                          />
+                        </Box>
+                        <Typography variant="caption" color="text.secondary">
+                          {project.client}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ))}
+                </List>
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          {/* Sosyal Medya */}
+          <Grid item xs={12} md={6}>
+            <Card sx={{ 
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)'
+            }}>
+              <CardContent sx={{ p: 3 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Sosyal Medya Analizi
+                  </Typography>
+                  <IconButton size="small">
+                    <MoreVertIcon />
+                  </IconButton>
+                </Box>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} sm={6}>
+                    <Bar 
+                      data={socialMediaData} 
+                      options={{
+                        indexAxis: 'y',
+                        responsive: true,
+                        plugins: {
+                          legend: {
+                            display: false,
+                          },
+                        },
+                        scales: {
+                          x: {
+                            beginAtZero: true,
+                          }
+                        }
+                      }}
+                      height={150}
+                    />
+                  </Grid>
+                  <Grid item xs={12} sm={6}>
+                    <List sx={{ p: 0 }}>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: '#1877f2' }}>
+                            <FacebookIcon />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary="Facebook" 
+                          secondary="5.2K takipçi" 
+                          primaryTypographyProps={{ variant: 'subtitle2' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label="+15%" 
+                          size="small" 
+                          color="success" 
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: '#e1306c' }}>
+                            <InstagramIcon />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary="Instagram" 
+                          secondary="8.4K takipçi" 
+                          primaryTypographyProps={{ variant: 'subtitle2' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label="+25%" 
+                          size="small" 
+                          color="success" 
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: '#1da1f2' }}>
+                            <TwitterIcon />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary="Twitter" 
+                          secondary="3.1K takipçi" 
+                          primaryTypographyProps={{ variant: 'subtitle2' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label="+10%" 
+                          size="small" 
+                          color="success" 
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                      <ListItem sx={{ px: 0 }}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: '#ff0000' }}>
+                            <YouTubeIcon />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary="YouTube" 
+                          secondary="12.3K abone" 
+                          primaryTypographyProps={{ variant: 'subtitle2' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label="+20%" 
+                          size="small" 
+                          color="success" 
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                    </List>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        </Grid>
+      </Box>
+    </Box>
+  );
+}

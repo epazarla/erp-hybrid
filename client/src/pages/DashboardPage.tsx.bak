@@ -1,0 +1,623 @@
+import React, { useState, useEffect, Component, ErrorInfo, ReactNode } from 'react';
+import { 
+  Box, 
+  Button, 
+  Card, 
+  CardContent, 
+  Chip, 
+  Container, 
+  Divider, 
+  Grid, 
+  IconButton, 
+  List, 
+  ListItem, 
+  ListItemAvatar, 
+  ListItemText, 
+  Paper, 
+  Typography, 
+  useTheme, 
+  Avatar,
+  LinearProgress,
+  Stack,
+  CircularProgress
+} from '@mui/material';
+import { 
+  TrendingUp as TrendingUpIcon,
+  TrendingDown as TrendingDownIcon,
+  MoreVert as MoreVertIcon,
+  CheckCircle as CheckCircleIcon,
+  Schedule as ScheduleIcon,
+  Flag as FlagIcon,
+  Facebook as FacebookIcon,
+  Instagram as InstagramIcon,
+  Twitter as TwitterIcon,
+  YouTube as YouTubeIcon,
+  ArrowForward as ArrowForwardIcon,
+  Business as BusinessIcon,
+  Done as DoneIcon,
+  PriorityHigh as PriorityHighIcon,
+  AccessTime as AccessTimeIcon,
+  CheckCircleOutline as CheckCircleOutlineIcon
+} from '@mui/icons-material';
+import { 
+  Chart as ChartJS, 
+  CategoryScale, 
+  LinearScale, 
+  PointElement, 
+  LineElement, 
+  BarElement,
+  Title, 
+  Tooltip, 
+  Legend, 
+  ArcElement,
+  Filler
+} from 'chart.js';
+import { Line, Bar, Doughnut } from 'react-chartjs-2';
+import { format } from 'date-fns';
+import { tr } from 'date-fns/locale';
+import { Task, getAllTasks, TASKS_UPDATED_EVENT, TASK_STATUSES, TASK_STATUS_LABELS } from '../services/TaskService';
+import { User, getActiveUsers } from '../services/UserService';
+import { Client, getAllClients, CLIENTS_UPDATED_EVENT, SECTORS } from '../services/ClientService';
+
+// Chart.js bileşenlerini kaydet
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  Filler
+);
+
+// Kullanıcı avatar URL'lerini önbellek için saklayacak nesne
+const userAvatars: Record<number, string> = {
+  1: 'https://randomuser.me/api/portraits/men/1.jpg',
+  2: 'https://randomuser.me/api/portraits/women/2.jpg',
+  3: 'https://randomuser.me/api/portraits/men/3.jpg',
+  4: 'https://randomuser.me/api/portraits/women/4.jpg',
+  5: 'https://randomuser.me/api/portraits/men/5.jpg'
+};
+
+// Proje arayüzü
+interface Project {
+  name: string;
+  progress: number;
+  client: string;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+// Müşteri avatar renklerini belirlemek için kullanılacak renkler
+const avatarColors = [
+  '#1877f2', // Mavi
+  '#e1306c', // Pembe
+  '#ff9800', // Turuncu
+  '#4caf50', // Yeşil
+  '#9c27b0', // Mor
+  '#f44336', // Kırmızı
+  '#2196f3', // Açık Mavi
+  '#607d8b', // Gri Mavi
+  '#795548', // Kahverengi
+  '#00bcd4', // Turkuaz
+];
+
+// Hata sınırı bileşeni
+class ErrorBoundary extends Component<{ children: ReactNode, fallback?: ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: ReactNode, fallback?: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Dashboard hata sınırı yakaladı:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Hata durumunda gösterilecek içerik
+      return this.props.fallback || (
+        <Box sx={{ p: 3 }}>
+          <Paper sx={{ p: 3, bgcolor: '#FFF3F3', color: 'error.main' }}>
+            <Typography variant="h6" gutterBottom>
+              Dashboard yüklenirken bir hata oluştu
+            </Typography>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              {this.state.error?.message || 'Bilinmeyen hata'}
+            </Typography>
+            <Typography variant="body2" sx={{ mb: 2, whiteSpace: 'pre-wrap' }}>
+              {this.state.error?.stack}
+            </Typography>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={() => window.location.reload()}
+            >
+              Sayfayı Yenile
+            </Button>
+          </Paper>
+        </Box>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Ana Dashboard bileşeni
+export default function DashboardPage() {
+  const theme = useTheme();
+  
+  // State tanımlamaları
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activeUsers, setActiveUsers] = useState<User[]>([]);
+  const [activeClients, setActiveClients] = useState<Client[]>([]);
+  const [ongoingTasks, setOngoingTasks] = useState<Task[]>([]);
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [completedTaskCount, setCompletedTaskCount] = useState<number>(0);
+  const [completedTasksChange, setCompletedTasksChange] = useState<number>(0);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectCount, setActiveProjectCount] = useState<number>(0);
+  const [taskCompletionRate, setTaskCompletionRate] = useState<number>(0);
+  
+  // Yükleme durumu
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>("");
+  
+  // Görevleri, kullanıcıları ve müşterileri yükle
+  useEffect(() => {
+    loadTasks();
+    loadUsers();
+    loadClients();
+    
+    // Görev güncellemelerini dinle
+    const handleTasksUpdated = () => {
+      console.log('Görevler güncellendi, dashboard yeniden yükleniyor...');
+      loadTasks();
+    };
+    
+    // Müşteri güncellemelerini dinle
+    const handleClientsUpdated = () => {
+      console.log('Müşteriler güncellendi, dashboard yeniden yükleniyor...');
+      loadClients();
+    };
+    
+    window.addEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
+    window.addEventListener(CLIENTS_UPDATED_EVENT, handleClientsUpdated);
+    
+    return () => {
+      window.removeEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
+      window.removeEventListener(CLIENTS_UPDATED_EVENT, handleClientsUpdated);
+    };
+  }, []);
+  
+  // Görevleri yükle ve projeleri oluştur
+                          <Typography variant="caption">{getTaskStatusText(status)}</Typography>
+                          <Typography variant="caption">{percentage}%</Typography>
+                        </Box>
+                        <LinearProgress 
+                          variant="determinate" 
+                          value={percentage} 
+                          color={statusColor as any}
+                          sx={{ height: 6, borderRadius: 3 }}
+                        />
+                      </Box>
+                    );
+                  })}
+                </Box>
+              </CardContent>
+            </Card>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Yaklaşan Görevler
+                </Typography>
+                <Chip 
+                  label={`${upcomingTasks.length} görev`} 
+                  color="warning" 
+                  size="small"
+                  sx={{ height: 24, fontSize: '0.7rem' }}
+                />
+              </Box>
+              
+              {upcomingTasks.length === 0 ? (
+                <Box sx={{ textAlign: 'center', py: 3 }}>
+                  <Typography color="text.secondary" variant="body2">
+                    Yaklaşan görev bulunmuyor
+                  </Typography>
+                </Box>
+              ) : (
+                <List sx={{ p: 0 }}>
+                  {upcomingTasks.map((task) => {
+                    const { name, avatar } = getUserInfo(task.assigned_to);
+                    const dueDate = new Date(task.due_date);
+                    const today = new Date();
+                    const diffDays = Math.ceil((dueDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    // Görev süresine göre renk belirleme
+                    let urgencyColor = 'success';
+                    if (diffDays <= 1) {
+                      urgencyColor = 'error';
+                    } else if (diffDays <= 3) {
+                      urgencyColor = 'warning';
+                    }
+                    
+                    return (
+                      <ListItem key={task.id} sx={{ px: 0, py: 1.5 }}>
+                        <ListItemAvatar>
+                          <Avatar src={avatar}>{name.charAt(0)}</Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary={task.title}
+                          secondary={
+                            <>
+                              <Typography variant="caption" component="span" color="text.secondary">
+                                {name} • {task.priority === 'high' ? (
+                                  <Typography component="span" color="error.main" variant="caption" fontWeight="bold">
+                                    Yüksek Öncelik
+                                  </Typography>
+                                ) : task.priority === 'medium' ? (
+                                  <Typography component="span" color="warning.main" variant="caption">
+                                    Orta Öncelik
+                                  </Typography>
+                                ) : (
+                                  <Typography component="span" color="text.secondary" variant="caption">
+                                    Düşük Öncelik
+                                  </Typography>
+                                )}
+                              </Typography>
+                            </>
+                          }
+                          primaryTypographyProps={{ 
+                            variant: 'subtitle2', 
+                            sx: { fontWeight: 500, mb: 0.5 } 
+                          }}
+                        />
+                        <Chip 
+                          label={diffDays <= 0 ? 'Bugün' : `${diffDays} gün`} 
+                          color={urgencyColor as any} 
+                          size="small"
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              )}
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              <CardContent sx={{ flexGrow: 1, pb: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="h6" fontWeight="bold">
+                    Devam Eden Görevler
+                  </Typography>
+                  <Chip 
+                    label={`${ongoingTasks.length} görev`} 
+                    color="info" 
+                    size="small"
+                    sx={{ height: 24, fontSize: '0.7rem' }}
+                  />
+                </Box>
+                
+                {ongoingTasks.length === 0 ? (
+                  <Box sx={{ textAlign: 'center', py: 3 }}>
+                    <Typography color="text.secondary" variant="body2">
+                      Devam eden görev bulunmuyor
+                    </Typography>
+                  </Box>
+                ) : (
+                  <List sx={{ p: 0 }}>
+                    {ongoingTasks.map((task, index) => {
+                      const userInfo = getUserInfo(task.assigned_to);
+                      return (
+                        <ListItem key={task.id} sx={{ px: 0, py: 0.5 }}>
+                          <ListItemAvatar sx={{ minWidth: 40 }}>
+                            <Avatar 
+                              src={userInfo.avatar}
+                              sx={{ width: 32, height: 32 }}
+                            />
+                          </ListItemAvatar>
+                          <ListItemText 
+                            primary={task.title} 
+                            secondary={format(new Date(task.due_date), 'dd MMM yyyy', { locale: tr })}
+                            primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
+                            secondaryTypographyProps={{ variant: 'caption' }}
+                          />
+                          <Chip 
+                            label={getTaskStatusText(task.status)} 
+                            size="small" 
+                            color={getTaskStatusColor(task.status) as any}
+                            sx={{ height: 24, fontSize: '0.7rem' }}
+                          />
+                        </ListItem>
+                      );
+                    })}
+                  </List>
+                )}
+              </CardContent>
+              <Box sx={{ p: 2, pt: 0 }}>
+                <Button 
+                  variant="contained" 
+                  fullWidth 
+                  size="small"
+                  color="info"
+                  endIcon={<ArrowForwardIcon />}
+                  href="/tasks"
+                >
+                  Devam Eden Görevleri Yönet
+                </Button>
+              </Box>
+            </Card>
+          </Card>
+        </Grid>
+        
+        {/* Grafik Satırı */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Görev Tamamlama Analizi
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Son 6 ay içindeki görev durumlarının analizi
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <Bar 
+                  data={taskCompletionData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        align: 'end',
+                      },
+                    },
+                    scales: {
+                      x: {
+                        grid: {
+                          display: false,
+                        },
+                      },
+                      y: {
+                        beginAtZero: true,
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Müşteri Sektör Dağılımı
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Aktif müşterilerin sektörlere göre dağılımı
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Box sx={{ height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Doughnut 
+                  data={clientDistributionData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'bottom',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Alt Satır */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Gelir Analizi
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Son 6 ay içindeki ödeme durumlarına göre gelir analizi
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <Line 
+                  data={revenueData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        align: 'end',
+                      },
+                    },
+                    scales: {
+                      x: {
+                        grid: {
+                          display: false,
+                        },
+                      },
+                      y: {
+                        beginAtZero: true,
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Sosyal Medya
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6}>
+                  <Doughnut 
+                    data={sectorData} 
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          display: false,
+                        },
+                      },
+                      scales: {
+                        x: {
+                          beginAtZero: true,
+                        }
+                      }
+                    }}
+                    height={150}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <List sx={{ p: 0 }}>
+                    {/* Müşteri sektör dağılımını göster */}
+                    {sectorDistribution.sectors.slice(0, 4).map((sector, index) => {
+                      const count = sectorDistribution.counts[index];
+                      const color = avatarColors[index % avatarColors.length];
+                      
+                      // Sektörün toplam müşteri sayısına oranı
+                      const totalClients = sectorDistribution.counts.reduce((sum, c) => sum + c, 0);
+                      const percentage = totalClients > 0 ? Math.round((count / totalClients) * 100) : 0;
+                      
+                      return (
+                        <ListItem key={sector} sx={{ px: 0 }}>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: color }}>
+                              {sector.charAt(0)}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText 
+                            primary={sector} 
+                            secondary={`${count} müşteri`} 
+                            primaryTypographyProps={{ variant: 'subtitle2' }}
+                            secondaryTypographyProps={{ variant: 'caption' }}
+                          />
+                          <Chip 
+                            label={`${percentage}%`} 
+                            size="small" 
+                            color={percentage > 20 ? "success" : "primary"} 
+                            sx={{ height: 24, fontSize: '0.7rem' }}
+                          />
+                        </ListItem>
+                      );
+                    })}
+                    
+                    {/* Eğer 4'ten az sektör varsa boş listeler ekle */}
+                    {Array.from({ length: Math.max(0, 4 - sectorDistribution.sectors.length) }).map((_, i) => (
+                      <ListItem key={`empty-${i}`} sx={{ px: 0, opacity: 0.5 }}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: 'grey.300' }}>
+                            <BusinessIcon />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary="Veri yok" 
+                          secondary="0 müşteri" 
+                          primaryTypographyProps={{ variant: 'subtitle2' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label="0%" 
+                          size="small" 
+                          color="default" 
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Container>
+  </Box>
+  </ErrorBoundary>
+);
+}
+
+```

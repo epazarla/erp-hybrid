@@ -1,0 +1,244 @@
+import { useState, useEffect } from 'react';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { lightTheme, darkTheme } from './theme';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+
+// Layout
+import DashboardLayout from './components/layout/DashboardLayout';
+
+// Pages
+import DashboardPage from './pages/DashboardPage';
+import TasksPage from './pages/TasksPage';
+import TeamPage from './pages/TeamPage';
+import ClientsPage from './pages/ClientsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import SettingsPage from './pages/SettingsPage';
+import ProfilePage from './pages/ProfilePage';
+import AuthForm from './components/AuthForm';
+
+// Services
+import notificationService, { NotificationType } from './services/NotificationService';
+import { getCurrentUser, updateUserProfile, USERS_UPDATED_EVENT, USER_SWITCHED_EVENT } from './services/UserService';
+import directStorageService, { User } from './services/DirectStorageService';
+
+// Korumalı Route bileşeni
+const ProtectedRoute = ({ children }: { children: JSX.Element }) => {
+  const storedUser = localStorage.getItem('erp_current_user');
+  if (!storedUser) {
+    return <Navigate to="/login" replace />;
+  }
+  return children;
+};
+
+function AppContent() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [user, setUser] = useState<any>(null);
+  const [darkMode, setDarkMode] = useState<boolean>(false);
+  
+  // Kullanıcı oturum durumunu localStorage'dan kontrol et
+  useEffect(() => {
+    // DirectStorageService kullanarak mevcut kullanıcıyı yükle
+    const currentUser = directStorageService.getCurrentUser();
+    if (currentUser) {
+      console.log('Mevcut kullanıcı yüklendi:', currentUser);
+      setUser(currentUser);
+    } else {
+      // Mevcut kullanıcı yoksa, kullanıcı veritabanından ilk kullanıcıyı al
+      const users = directStorageService.getUsersDatabase();
+      if (users && Array.isArray(users) && users.length > 0) {
+        const firstUser = users[0];
+        console.log('Kullanıcı veritabanından ilk kullanıcı yüklendi:', firstUser);
+        setUser(firstUser);
+        // Mevcut kullanıcı olarak kaydet
+        directStorageService.saveCurrentUser(firstUser);
+      } else {
+        // Kullanıcı veritabanı boşsa, UserService'den kullanıcı al
+        const userFromService = getCurrentUser();
+        if (userFromService) {
+          console.log('UserService\'den kullanıcı yüklendi:', userFromService);
+          setUser(userFromService);
+          // Mevcut kullanıcı olarak kaydet
+          directStorageService.saveCurrentUser(userFromService);
+        }
+      }
+    }
+    
+    // Tema tercihini kontrol et
+    const storedTheme = localStorage.getItem('dark_mode');
+    if (storedTheme) {
+      setDarkMode(storedTheme === 'true');
+    }
+    
+    // Bildirim izinlerini kontrol et
+    if (notificationService.isEnabled()) {
+      notificationService.requestPermission();
+    }
+    
+    // localStorage değişikliklerini dinle
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'erp_current_user' && event.newValue) {
+        try {
+          const updatedUser = JSON.parse(event.newValue);
+          console.log('Mevcut kullanıcı değişti, state güncelleniyor...', updatedUser);
+          setUser(updatedUser);
+        } catch (error) {
+          console.error('Kullanıcı verisi ayrıştırılırken hata oluştu:', error);
+        }
+      }
+    };
+    
+    // Kullanıcı değişikliklerini dinle (eski yöntem de çalışsın diye)
+    const handleUserUpdated = () => {
+      console.log('Kullanıcı güncellendi, yeniden yükleniyor...');
+      const updatedUser = getCurrentUser();
+      if (updatedUser) {
+        setUser(updatedUser);
+        // Mevcut kullanıcıyı doğrudan güncelle
+        directStorageService.saveCurrentUser(updatedUser);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener(USERS_UPDATED_EVENT, handleUserUpdated);
+    window.addEventListener(USER_SWITCHED_EVENT, handleUserUpdated);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener(USERS_UPDATED_EVENT, handleUserUpdated);
+      window.removeEventListener(USER_SWITCHED_EVENT, handleUserUpdated);
+    };
+  }, []);
+
+  // Oturum açma işlemi
+  const handleLogin = (userData: any) => {
+    setUser(userData);
+    localStorage.setItem('erp_current_user', JSON.stringify(userData));
+    
+    // Giriş bildirimi göster
+    notificationService.showNotification(
+      'Hoş Geldiniz',
+      `Merhaba ${userData.name}, E-Pazarla ERP sistemine hoş geldiniz!`
+    );
+  };
+
+  // Oturum kapatma işlemi
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('erp_current_user');
+  };
+
+  // Tema değiştirme
+  const toggleTheme = () => {
+    const newThemeState = !darkMode;
+    setDarkMode(newThemeState);
+    localStorage.setItem('dark_mode', newThemeState.toString());
+  };
+
+  // Sayfa değiştirme
+  const handlePageChange = (page: string) => {
+    if (page === 'dashboard' || page === 'tasks' || page === 'team' || page === 'clients' || page === 'analytics' || page === 'settings' || page === 'profile') {
+      navigate(`/${page}`);
+    }
+  };
+  
+  // Profil güncelleme
+  const handleUpdateProfile = (userData: any) => {
+    // Kullanıcı ID'si kontrolü
+    if (!user || !user.id) {
+      console.error('Kullanıcı ID bulunamadı, profil güncellenemiyor');
+      return;
+    }
+    
+    console.log('Profil güncelleniyor:', user.id, userData);
+    
+    // DirectStorageService ile profil bilgilerini güncelle
+    const updatedUser = directStorageService.updateProfile(userData);
+    
+    if (updatedUser) {
+      // Yerel state'i güncelle
+      setUser(updatedUser);
+      
+      // Ayrıca UserService ile de güncelle (eski yöntem de çalışsın diye)
+      updateUserProfile(user.id, userData);
+      
+      // Başarı bildirimi göster
+      notificationService.showNotification(
+        'Profil Güncellendi',
+        'Profil bilgileriniz başarıyla güncellendi.'
+      );
+      
+      console.log('Profil başarıyla güncellendi:', updatedUser);
+    } else {
+      console.error('Mevcut kullanıcı bulunamadı, profil güncellenemiyor');
+      
+      // Hata bildirimi göster
+      notificationService.showNotification(
+        'Profil Güncelleme Hatası',
+        'Profil bilgileriniz güncellenirken bir hata oluştu.',
+        { type: NotificationType.ERROR }
+      );
+    }
+  };
+
+  // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+  useEffect(() => {
+    // Sadece kullanıcı yoksa login sayfasına yönlendir
+    if (!user && location.pathname !== '/login') {
+      navigate('/login');
+    } 
+    // Sadece login sayfasındaysa ve kullanıcı varsa dashboard'a yönlendir
+    else if (location.pathname === '/login' && user) {
+      navigate('/dashboard');
+    } 
+    // Sadece ana sayfadaysa dashboard'a yönlendir
+    else if (location.pathname === '/') {
+      navigate('/dashboard');
+    }
+    // Diğer tüm durumlarda mevcut sayfada kal
+  }, [user, location.pathname, navigate]);
+
+  return (
+    <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
+      <CssBaseline />
+      {location.pathname === '/login' ? (
+        <div className="auth-container">
+          <AuthForm onAuthSuccess={handleLogin} />
+        </div>
+      ) : (
+        <DashboardLayout 
+          onLogout={handleLogout} 
+          user={user}
+          onPageChange={handlePageChange}
+          onThemeToggle={toggleTheme}
+          darkMode={darkMode}
+          currentPath={location.pathname}
+        >
+          <Routes>
+            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/tasks" element={<TasksPage />} />
+            <Route path="/team" element={<TeamPage />} />
+            <Route path="/clients" element={<ClientsPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
+            <Route path="/profile" element={<ProfilePage user={user} onUpdateProfile={handleUpdateProfile} />} />
+          </Routes>
+        </DashboardLayout>
+      )}
+    </ThemeProvider>
+  );
+}
+
+// Sayfa yüklendiğinde URL'yi korumak için
+function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<AppContent />} />
+        <Route path="/*" element={<AppContent />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+export default App;

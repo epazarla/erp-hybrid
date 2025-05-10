@@ -1,0 +1,754 @@
+import React, { useEffect, useState } from 'react';
+import { 
+  Box, 
+  Typography, 
+  Card, 
+  CardContent, 
+  Grid, 
+  Chip, 
+  CircularProgress,
+  Alert,
+  Divider,
+  IconButton,
+  Tooltip,
+  TextField,
+  InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  OutlinedInput,
+  Button,
+  Stack,
+  Checkbox,
+  FormControlLabel,
+  Paper
+} from '@mui/material';
+import {
+  CheckCircle as CheckCircleIcon,
+  Schedule as ScheduleIcon,
+  ErrorOutline as ErrorOutlineIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Search as SearchIcon,
+  FilterList as FilterListIcon,
+  Sort as SortIcon,
+  Assignment as AssignmentIcon,
+  AssignmentInd as AssignmentIndIcon,
+  AssignmentTurnedIn as AssignmentTurnedInIcon,
+  Clear as ClearIcon
+} from '@mui/icons-material';
+import { API_BASE_URL } from '../config';
+import { Task, updateTask, deleteTask, restoreTask, getAllTasks } from '../services/TaskService';
+import TaskEditModal from './TaskEditModal';
+import UndoSnackbar from './UndoSnackbar';
+
+// Filtre seçeneği tipi
+type FilterOption = {
+  label: string;
+  value: string;
+};
+
+// Sıralama seçeneği tipi
+type SortOption = {
+  label: string;
+  value: string;
+  direction: 'asc' | 'desc';
+};
+
+// TaskList props tipi
+interface TaskListProps {
+  userId: number;
+  tasks: Task[];
+  showAssignedOnly?: boolean;
+  onTasksChanged?: () => void; // Görevler değiştiğinde parent bileşeni bilgilendirmek için
+}
+
+export default function TaskList({ userId, showAssignedOnly = false, tasks: propTasks, onTasksChanged }: TaskListProps) {
+  // Temel state'ler
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  
+  // Görev düzenleme state'leri
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  
+  // Görev silme ve geri alma state'leri
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [deletedTask, setDeletedTask] = useState<Task | null>(null);
+  
+  // Filtreleme state'leri
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [priorityFilter, setPriorityFilter] = useState<string[]>([]);
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [assignedToMe, setAssignedToMe] = useState(showAssignedOnly);
+  const [dateFilter, setDateFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SortOption>({
+    label: 'Son Tarih (Yakın)',
+    value: 'due_date',
+    direction: 'asc'
+  });
+  
+  // Filtre seçenekleri
+  const statusOptions: FilterOption[] = [
+    { label: 'Tamamlandı', value: 'completed' },
+    { label: 'Devam Ediyor', value: 'in progress' },
+    { label: 'Beklemede', value: 'pending' },
+    { label: 'İptal', value: 'cancelled' }
+  ];
+  
+  const priorityOptions: FilterOption[] = [
+    { label: 'Düşük', value: 'low' },
+    { label: 'Orta', value: 'medium' },
+    { label: 'Yüksek', value: 'high' }
+  ];
+  
+  const categoryOptions: FilterOption[] = [
+    { label: 'Geliştirme', value: 'development' },
+    { label: 'Tasarım', value: 'design' },
+    { label: 'Pazarlama', value: 'marketing' },
+    { label: 'Satış', value: 'sales' },
+    { label: 'Destek', value: 'support' }
+  ];
+  
+  const dateFilterOptions: FilterOption[] = [
+    { label: 'Tümü', value: 'all' },
+    { label: 'Bugün', value: 'today' },
+    { label: 'Bu Hafta', value: 'week' },
+    { label: 'Bu Ay', value: 'month' },
+    { label: 'Geçmiş', value: 'past' },
+    { label: 'Gelecek', value: 'future' }
+  ];
+  
+  const sortOptions: SortOption[] = [
+    { label: 'Son Tarih (Yakın)', value: 'due_date', direction: 'asc' },
+    { label: 'Son Tarih (Uzak)', value: 'due_date', direction: 'desc' },
+    { label: 'Son Eklenen', value: 'created_at', direction: 'desc' },
+    { label: 'İlk Eklenen', value: 'created_at', direction: 'asc' },
+    { label: 'Başlık (A-Z)', value: 'title', direction: 'asc' },
+    { label: 'Başlık (Z-A)', value: 'title', direction: 'desc' }
+  ];
+
+  // Görevleri prop'tan al
+  useEffect(() => {
+    if (propTasks && propTasks.length > 0) {
+      console.log('TaskList: propTasks alındı, görev sayısı:', propTasks.length);
+      setTasks(propTasks);
+      setLoading(false);
+    } else {
+      console.log('TaskList: propTasks boş, tüm görevler yükleniyor...');
+      const allTasks = getAllTasks();
+      setTasks(allTasks);
+      setLoading(false);
+    }
+  }, [propTasks]);
+  
+  // Global görev güncellemelerini dinle
+  useEffect(() => {
+    const handleTasksUpdated = (event: Event) => {
+      console.log('TaskList: tasksUpdated olayı alındı');
+      const updatedTasks = getAllTasks();
+      setTasks(updatedTasks);
+      
+      // Parent bileşeni bilgilendir
+      if (onTasksChanged) {
+        onTasksChanged();
+      }
+    };
+    
+    window.addEventListener('tasksUpdated', handleTasksUpdated);
+    
+    return () => {
+      window.removeEventListener('tasksUpdated', handleTasksUpdated);
+    };
+  }, [onTasksChanged]);
+  
+  // Filtreleme işlemi
+  useEffect(() => {
+    if (tasks.length === 0) return;
+    
+    let filtered = [...tasks];
+    
+    // Arama filtresi
+    if (searchTerm) {
+      filtered = filtered.filter(task => 
+        task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        task.description.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+    
+    // Durum filtresi
+    if (statusFilter.length > 0) {
+      filtered = filtered.filter(task => statusFilter.includes(task.status));
+    }
+    
+    // Öncelik filtresi
+    if (priorityFilter.length > 0) {
+      filtered = filtered.filter(task => 
+        task.priority && priorityFilter.includes(task.priority)
+      );
+    }
+    
+    // Kategori filtresi
+    if (categoryFilter.length > 0) {
+      filtered = filtered.filter(task => 
+        task.category && categoryFilter.includes(task.category)
+      );
+    }
+    
+    // Bana atananlar filtresi
+    if (assignedToMe) {
+      filtered = filtered.filter(task => task.assigned_to === userId);
+    }
+    
+    // Tarih filtresi
+    if (dateFilter && dateFilter !== 'all') {
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const weekStart = new Date(today);
+      weekStart.setDate(today.getDate() - today.getDay());
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      
+      filtered = filtered.filter(task => {
+        const dueDate = new Date(task.due_date);
+        
+        switch (dateFilter) {
+          case 'today':
+            return dueDate.toDateString() === today.toDateString();
+          case 'week':
+            return dueDate >= weekStart && dueDate < new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+          case 'month':
+            return dueDate.getMonth() === now.getMonth() && dueDate.getFullYear() === now.getFullYear();
+          case 'past':
+            return dueDate < today;
+          case 'future':
+            return dueDate > today;
+          default:
+            return true;
+        }
+      });
+    }
+    
+    // Sıralama
+    filtered.sort((a, b) => {
+      const aValue = a[sortBy.value as keyof Task];
+      const bValue = b[sortBy.value as keyof Task];
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return sortBy.direction === 'asc' 
+          ? aValue.localeCompare(bValue)
+          : bValue.localeCompare(aValue);
+      }
+      
+      if (aValue instanceof Date && bValue instanceof Date) {
+        return sortBy.direction === 'asc' 
+          ? aValue.getTime() - bValue.getTime()
+          : bValue.getTime() - aValue.getTime();
+      }
+      
+      // Tarih string'leri için
+      if (typeof aValue === 'string' && typeof bValue === 'string' && 
+          (sortBy.value === 'due_date' || sortBy.value === 'created_at')) {
+        const dateA = new Date(aValue);
+        const dateB = new Date(bValue);
+        return sortBy.direction === 'asc' 
+          ? dateA.getTime() - dateB.getTime()
+          : dateB.getTime() - dateA.getTime();
+      }
+      
+      return 0;
+    });
+    
+    setFilteredTasks(filtered);
+  }, [
+    tasks, 
+    searchTerm, 
+    statusFilter, 
+    priorityFilter, 
+    categoryFilter, 
+    assignedToMe, 
+    dateFilter, 
+    sortBy,
+    userId
+  ]);
+  
+  // Görev durumuna göre renk belirleme
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return 'success';
+      case 'in progress':
+        return 'info';
+      case 'pending':
+        return 'warning';
+      case 'cancelled':
+        return 'error';
+      default:
+        return 'default';
+    }
+  };
+  
+  // Görev durumuna göre ikon belirleme
+  const getStatusIcon = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'completed':
+        return <CheckCircleIcon fontSize="small" />;
+      case 'in progress':
+        return <ScheduleIcon fontSize="small" />;
+      case 'pending':
+        return <ScheduleIcon fontSize="small" />;
+      case 'cancelled':
+        return <ErrorOutlineIcon fontSize="small" />;
+      default:
+        return null;
+    }
+  };
+  
+  // Arama ve filtreleme işlemleri
+  const handleSearchChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.target.value);
+  };
+  
+  const handleStatusFilterChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    setStatusFilter(event.target.value as string[]);
+  };
+  
+  const handlePriorityFilterChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    setPriorityFilter(event.target.value as string[]);
+  };
+  
+  const handleCategoryFilterChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    setCategoryFilter(event.target.value as string[]);
+  };
+  
+  const handleAssignedToMeChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setAssignedToMe(event.target.checked);
+  };
+  
+  const handleDateFilterChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    setDateFilter(event.target.value as string);
+  };
+  
+  const handleSortChange = (event: React.ChangeEvent<{ value: unknown }>) => {
+    const value = event.target.value as string;
+    const [sortValue, direction] = value.split('-');
+    
+    setSortBy({
+      label: sortOptions.find(o => o.value === sortValue && o.direction === direction)?.label || '',
+      value: sortValue,
+      direction: direction as 'asc' | 'desc'
+    });
+  };
+  
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter([]);
+    setPriorityFilter([]);
+    setCategoryFilter([]);
+    setDateFilter('all');
+    setSortBy({
+      label: 'Son Tarih (Yakın)',
+      value: 'due_date',
+      direction: 'asc'
+    });
+    
+    if (!showAssignedOnly) {
+      setAssignedToMe(false);
+    }
+  };
+  
+  // Görev düzenleme işlevleri
+  const handleEditTask = (task: Task) => {
+    setSelectedTask(task);
+    setEditModalOpen(true);
+  };
+  
+  const handleTaskUpdated = () => {
+    // Görev güncellemesinden sonra görevleri yeniden yükle
+    const updatedTasks = getAllTasks();
+    setTasks(updatedTasks);
+    
+    // Parent bileşeni bilgilendir
+    if (onTasksChanged) {
+      onTasksChanged();
+    }
+  };
+  
+  // Görev silme işlevi
+  const handleDeleteTask = (task: Task) => {
+    console.log(`Görev silme işlemi başlatıldı: ID=${task.id}, Başlık="${task.title}"`);
+    
+    // Görevi sil
+    const deletedTaskData = deleteTask(task.id);
+    
+    if (deletedTaskData) {
+      // Silinen görevi state'e kaydet
+      setDeletedTask(deletedTaskData);
+      
+      // Snackbar'ı göster
+      setSnackbarMessage(`"${task.title}" görevi silindi.`);
+      setSnackbarOpen(true);
+      
+      // Görevleri güncelle
+      const updatedTasks = getAllTasks();
+      setTasks(updatedTasks);
+      
+      // Parent bileşeni bilgilendir
+      if (onTasksChanged) {
+        onTasksChanged();
+      }
+      
+      console.log(`Görev başarıyla silindi: ID=${task.id}, Kalan görev sayısı: ${updatedTasks.length}`);
+    } else {
+      console.error(`Görev silinemedi: ID=${task.id}`);
+    }
+  };
+  
+  // Görevi geri alma işlevi
+  const handleUndoDelete = () => {
+    if (deletedTask) {
+      console.log(`Silinen görev geri alınıyor: ID=${deletedTask.id}, Başlık="${deletedTask.title}"`);
+      
+      // Silinen görevi geri yükle
+      restoreTask(deletedTask);
+      
+      // Görevleri güncelle
+      const updatedTasks = getAllTasks();
+      setTasks(updatedTasks);
+      
+      // Parent bileşeni bilgilendir
+      if (onTasksChanged) {
+        onTasksChanged();
+      }
+      
+      // Snackbar'ı kapat
+      setSnackbarOpen(false);
+      setDeletedTask(null);
+      
+      console.log(`Görev başarıyla geri alındı: ID=${deletedTask.id}, Güncel görev sayısı: ${updatedTasks.length}`);
+    }
+  };
+  
+  // Snackbar kapatma işlevi
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+    setDeletedTask(null);
+  };
+  
+  // Filtreleri göster/gizle
+  const toggleFilters = () => {
+    setShowFilters(!showFilters);
+  };
+
+  return (
+    <Box sx={{ width: '100%' }}>
+      {/* Görev Düzenleme Modalı */}
+      <TaskEditModal
+        open={editModalOpen}
+        task={selectedTask}
+        onClose={() => setEditModalOpen(false)}
+        onTaskUpdated={handleTaskUpdated}
+      />
+      
+      {/* Geri Alma Snackbar'ı */}
+      <UndoSnackbar
+        open={snackbarOpen}
+        message={snackbarMessage}
+        onClose={handleCloseSnackbar}
+        onUndo={handleUndoDelete}
+      />
+      
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography variant="h5" fontWeight="medium">
+          Görevler ({filteredTasks.length})
+        </Typography>
+        
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button 
+            variant="outlined" 
+            startIcon={<FilterListIcon />}
+            onClick={toggleFilters}
+            size="small"
+            color={showFilters ? 'primary' : 'inherit'}
+          >
+            Filtreler
+          </Button>
+        </Box>
+      </Box>
+      
+      {/* Arama */}
+      <TextField
+        fullWidth
+        placeholder="Görev ara..."
+        value={searchTerm}
+        onChange={handleSearchChange}
+        sx={{ mb: 3 }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <SearchIcon />
+            </InputAdornment>
+          ),
+          sx: { borderRadius: '8px' }
+        }}
+        size="small"
+      />
+      
+      {/* Filtreler */}
+      {showFilters && (
+        <Paper sx={{ p: 2, mb: 3 }} variant="outlined">
+          <Grid container spacing={2}>
+            <Grid item xs={12}>
+              <Typography variant="subtitle1" fontWeight="medium" gutterBottom>
+                Filtreler
+              </Typography>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Checkbox 
+                    checked={assignedToMe} 
+                    onChange={handleAssignedToMeChange}
+                    color="primary"
+                  />
+                }
+                label="Sadece bana atanan görevleri göster"
+              />
+            </Grid>
+            
+            <Grid item container spacing={2}>
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="status-filter-label">Durum</InputLabel>
+                  <Select
+                    labelId="status-filter-label"
+                    id="status-filter"
+                    multiple
+                    value={statusFilter}
+                    onChange={handleStatusFilterChange as any}
+                    input={<OutlinedInput label="Durum" />}
+                    renderValue={(selected) => (
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                        {(selected as string[]).map((value) => (
+                          <Chip 
+                            key={value} 
+                            label={statusOptions.find(option => option.value === value)?.label || value} 
+                            size="small"
+                          />
+                        ))}
+                      </Stack>
+                    )}
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 224,
+                          borderRadius: '8px'
+                        },
+                      },
+                    }}
+                  >
+                    {statusOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+              
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="priority-filter-label">Öncelik</InputLabel>
+                  <Select
+                    labelId="priority-filter-label"
+                    id="priority-filter"
+                    multiple
+                    value={priorityFilter}
+                    onChange={handlePriorityFilterChange as any}
+                    input={<OutlinedInput label="Öncelik" />}
+                    renderValue={(selected) => (
+                      <Stack direction="row" spacing={0.5} flexWrap="wrap">
+                        {(selected as string[]).map((value) => (
+                          <Chip 
+                            key={value} 
+                            label={priorityOptions.find(option => option.value === value)?.label || value} 
+                            size="small"
+                          />
+                        ))}
+                      </Stack>
+                    )}
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 224,
+                          borderRadius: '8px'
+                        },
+                      },
+                    }}
+                  >
+                    {priorityOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+                
+              <Grid item xs={12} sm={4}>
+                <FormControl fullWidth size="small">
+                  <InputLabel id="date-filter-label">Tarih</InputLabel>
+                  <Select
+                    labelId="date-filter-label"
+                    id="date-filter"
+                    value={dateFilter}
+                    onChange={handleDateFilterChange as any}
+                    input={<OutlinedInput label="Tarih" />}
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 224,
+                          borderRadius: '8px'
+                        },
+                      },
+                    }}
+                  >
+                    {dateFilterOptions.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+              </Grid>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <FormControl size="small" sx={{ minWidth: 200 }}>
+                  <InputLabel id="sort-label">Sıralama</InputLabel>
+                  <Select
+                    labelId="sort-label"
+                    id="sort"
+                    value={`${sortBy.value}-${sortBy.direction}`}
+                    onChange={handleSortChange as any}
+                    input={<OutlinedInput label="Sıralama" />}
+                    MenuProps={{
+                      PaperProps: {
+                        style: {
+                          maxHeight: 224,
+                          borderRadius: '8px'
+                        },
+                      },
+                    }}
+                  >
+                    {sortOptions.map((option) => (
+                      <MenuItem key={`${option.value}-${option.direction}`} value={`${option.value}-${option.direction}`}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                
+                <Button 
+                  variant="text" 
+                  startIcon={<ClearIcon />} 
+                  onClick={clearFilters}
+                  size="small"
+                >
+                  Filtreleri Temizle
+                </Button>
+              </Box>
+            </Grid>
+          </Grid>
+        </Paper>
+      )}
+      
+      {loading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+          <CircularProgress />
+        </Box>
+      ) : error ? (
+        <Alert severity="error" sx={{ mt: 2 }}>
+          {error}
+        </Alert>
+      ) : filteredTasks.length === 0 ? (
+        <Alert severity="info" sx={{ mt: 2 }}>
+          Filtrelere uygun görev bulunamadı.
+        </Alert>
+      ) : (
+        <Grid container spacing={3}>
+          {filteredTasks.map((task) => (
+            <Grid item xs={12} sm={6} md={4} key={task.id}>
+              <Card 
+                sx={{ 
+                  height: '100%', 
+                  display: 'flex', 
+                  flexDirection: 'column',
+                  borderRadius: '12px',
+                  transition: 'all 0.2s ease-in-out',
+                  '&:hover': {
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                    transform: 'translateY(-4px)'
+                  }
+                }}
+                elevation={0}
+                variant="outlined"
+              >
+                <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                    <Chip 
+                      label={task.status} 
+                      size="small" 
+                      color={getStatusColor(task.status) as any}
+                      icon={getStatusIcon(task.status) || undefined}
+                      sx={{ height: 24, fontWeight: 500 }}
+                    />
+                    <Box>
+                      <Tooltip title="Düzenle">
+                        <IconButton size="small" onClick={() => handleEditTask(task)}>
+                          <EditIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Sil">
+                        <IconButton size="small" color="error" onClick={() => handleDeleteTask(task)}>
+                          <DeleteIcon fontSize="small" />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
+                  </Box>
+                  
+                  <Typography variant="h6" component="h3" gutterBottom>
+                    {task.title}
+                  </Typography>
+                  
+                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2, flexGrow: 1 }}>
+                    {task.description}
+                  </Typography>
+                  
+                  <Divider sx={{ my: 1.5 }} />
+                  
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 'auto' }}>
+                    <Typography variant="caption" color="text.secondary">
+                      Oluşturulma: {new Date(task.created_at).toLocaleDateString('tr-TR')}
+                    </Typography>
+                    
+                    <Typography variant="caption" fontWeight="medium" color="primary">
+                      Bitiş: {new Date(task.due_date).toLocaleDateString('tr-TR')}
+                    </Typography>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+      )}
+    </Box>
+  );
+}

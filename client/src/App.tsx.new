@@ -1,0 +1,272 @@
+import React, { useState, useEffect, memo, useCallback, Suspense } from 'react';
+import { User } from './services/DirectStorageService';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { lightTheme, darkTheme } from './theme';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+
+// Layout
+import DashboardLayout from './components/layout/DashboardLayout';
+
+// Pages - doğrudan import et (lazy loading kullanmıyoruz - daha hızlı yükleme için)
+import DashboardPage from './pages/DashboardPage';
+import TasksPage from './pages/TasksPage';
+import TeamPage from './pages/TeamPage';
+import ClientsPage from './pages/ClientsPage';
+import AnalyticsPage from './pages/AnalyticsPage';
+import SettingsPage from './pages/SettingsPage';
+import ProfilePage from './pages/ProfilePage';
+import LoginPage from './pages/LoginPage';
+import RegisterPage from './pages/RegisterPage';
+
+// Services
+import * as UserService from './services/UserService';
+import notificationService from './services/NotificationService';
+
+// Performans için memoize edilmiş sayfalar
+const MemoizedDashboardPage = memo(DashboardPage);
+const MemoizedTasksPage = memo(TasksPage);
+const MemoizedTeamPage = memo(TeamPage);
+const MemoizedClientsPage = memo(ClientsPage);
+const MemoizedAnalyticsPage = memo(AnalyticsPage);
+const MemoizedSettingsPage = memo(SettingsPage);
+const MemoizedProfilePage = memo(ProfilePage);
+
+// Optimize edilmiş App bileşeni
+function App() {
+  const [darkMode, setDarkMode] = useState(() => {
+    // İlk render sırasında localStorage'dan tema tercihini al
+    const storedTheme = localStorage.getItem('dark_mode');
+    return storedTheme === 'true';
+  });
+  
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    // İlk render sırasında localStorage'dan kullanıcı bilgisini al
+    return UserService.getCurrentUser();
+  });
+  
+  const [loading, setLoading] = useState(true);
+
+  // Daha da hızlandırılmış sayfa yükleme
+  useEffect(() => {
+    // Yükleme ekranını hemen kaldır
+    setLoading(false);
+    
+    // Bildirim izinlerini arka planda kontrol et - kullanıcıyı bekletme
+    setTimeout(() => {
+      if (notificationService.isEnabled()) {
+        notificationService.requestPermission();
+      }
+    }, 2000); // Sayfa yüklendikten 2 saniye sonra kontrol et
+  }, []);
+
+  // Kullanıcı değişikliklerini dinle - optimize edilmiş versiyon
+  useEffect(() => {
+    const handleUserUpdated = () => {
+      const user = UserService.getCurrentUser();
+      setCurrentUser(user);
+    };
+
+    // Sadece gerekli event'leri dinle
+    window.addEventListener('userUpdated', handleUserUpdated);
+    
+    // Storage event'i için optimize edilmiş handler
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === 'erp_current_user') {
+        handleUserUpdated();
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener('userUpdated', handleUserUpdated);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
+  // Tema değiştirme
+  const toggleTheme = () => {
+    const newThemeState = !darkMode;
+    setDarkMode(newThemeState);
+    localStorage.setItem('dark_mode', newThemeState.toString());
+  };
+
+  // Oturum kapatma
+  const handleLogout = () => {
+    UserService.logout();
+    setCurrentUser(null);
+  };
+
+  // Sayfa değiştirme
+  const handlePageChange = (page: string) => {
+    // React Router ile sayfa değişimi burada yapılmıyor
+    // DashboardLayout içinde Link bileşenleri kullanılıyor
+    console.log('Sayfa değişiyor:', page);
+  };
+
+  // Kullanıcı girişi
+  const handleLogin = (userData: User) => {
+    setCurrentUser(userData);
+  };
+
+  // Kullanıcı kaydı
+  const handleRegister = (userData: User) => {
+    setCurrentUser(userData);
+  };
+
+  // Profil güncelleme - optimize edilmiş versiyon
+  const handleUpdateProfile = useCallback((userData: Partial<User>) => {
+    if (currentUser && currentUser.id) {
+      const updatedUser = UserService.updateUserProfile(currentUser.id, userData);
+      if (updatedUser) {
+        setCurrentUser(updatedUser);
+        // Bildirim yerine konsola log
+        console.log('Profil Güncellendi', 'Profil bilgileriniz başarıyla güncellendi.');
+      }
+    }
+  }, [currentUser]);
+
+  // Basitleştirilmiş yükleniyor durumu - daha hızlı render için
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        height: '100vh',
+        backgroundColor: darkMode ? '#121212' : '#f5f5f5',
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ 
+            width: '30px', 
+            height: '30px', 
+            margin: '0 auto',
+            border: '3px solid #f3f3f3',
+            borderTop: '3px solid #3498db',
+            borderRadius: '50%',
+            animation: 'spin 0.6s linear infinite'
+          }} />
+          <style>{`
+            @keyframes spin {
+              0% { transform: rotate(0deg); }
+              100% { transform: rotate(360deg); }
+            }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
+      <CssBaseline />
+      <Suspense fallback={<div>Yükleniyor...</div>}>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/login" element={<LoginPage onLogin={handleLogin} />} />
+            <Route path="/register" element={<RegisterPage onRegister={handleRegister} />} />
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            
+            {/* Ana sayfa yönlendirmeleri */}
+            <Route path="/dashboard" element={
+              <DashboardLayout 
+                onLogout={handleLogout}
+                user={currentUser || { name: 'Misafir', email: 'guest@example.com' }}
+                onThemeToggle={toggleTheme}
+                darkMode={darkMode}
+                currentPath="/dashboard"
+              >
+                <MemoizedDashboardPage />
+              </DashboardLayout>
+            } />
+            
+            {/* Görevler */}
+            <Route path="/tasks" element={
+              <DashboardLayout 
+                onLogout={handleLogout}
+                user={currentUser || { name: 'Misafir', email: 'guest@example.com' }}
+                onThemeToggle={toggleTheme}
+                darkMode={darkMode}
+                currentPath="/tasks"
+              >
+                <MemoizedTasksPage />
+              </DashboardLayout>
+            } />
+            
+            {/* Ekip */}
+            <Route path="/team" element={
+              <DashboardLayout 
+                onLogout={handleLogout}
+                user={currentUser || { name: 'Misafir', email: 'guest@example.com' }}
+                onThemeToggle={toggleTheme}
+                darkMode={darkMode}
+                currentPath="/team"
+              >
+                <MemoizedTeamPage />
+              </DashboardLayout>
+            } />
+            
+            {/* Müşteriler */}
+            <Route path="/clients" element={
+              <DashboardLayout 
+                onLogout={handleLogout}
+                user={currentUser || { name: 'Misafir', email: 'guest@example.com' }}
+                onThemeToggle={toggleTheme}
+                darkMode={darkMode}
+                currentPath="/clients"
+              >
+                <MemoizedClientsPage />
+              </DashboardLayout>
+            } />
+            
+            {/* Analitik */}
+            <Route path="/analytics" element={
+              <DashboardLayout 
+                onLogout={handleLogout}
+                user={currentUser || { name: 'Misafir', email: 'guest@example.com' }}
+                onThemeToggle={toggleTheme}
+                darkMode={darkMode}
+                currentPath="/analytics"
+              >
+                <MemoizedAnalyticsPage />
+              </DashboardLayout>
+            } />
+            
+            {/* Ayarlar */}
+            <Route path="/settings" element={
+              <DashboardLayout 
+                onLogout={handleLogout}
+                user={currentUser || { name: 'Misafir', email: 'guest@example.com' }}
+                onThemeToggle={toggleTheme}
+                darkMode={darkMode}
+                currentPath="/settings"
+              >
+                <MemoizedSettingsPage />
+              </DashboardLayout>
+            } />
+            
+            {/* Profil */}
+            <Route path="/profile" element={
+              <DashboardLayout 
+                onLogout={handleLogout}
+                user={currentUser || { name: 'Misafir', email: 'guest@example.com' }}
+                onThemeToggle={toggleTheme}
+                darkMode={darkMode}
+                currentPath="/profile"
+              >
+                <MemoizedProfilePage 
+                  user={currentUser || { name: 'Misafir', email: 'guest@example.com' }} 
+                  onUpdateProfile={handleUpdateProfile} 
+                />
+              </DashboardLayout>
+            } />
+            
+            {/* Bilinmeyen rotalar */}
+            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          </Routes>
+        </BrowserRouter>
+      </Suspense>
+    </ThemeProvider>
+  );
+}
+
+export default App;

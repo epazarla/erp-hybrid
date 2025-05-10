@@ -1,0 +1,650 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Box, 
+  CssBaseline, 
+  Drawer, 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Divider, 
+  IconButton, 
+  Avatar,
+  Menu,
+  MenuItem,
+  Tooltip,
+  useTheme,
+  ThemeProvider,
+  Badge,
+  Paper,
+  Button,
+  InputBase,
+  Chip,
+  Container
+} from '@mui/material';
+import {
+  Menu as MenuIcon,
+  ChevronLeft as ChevronLeftIcon,
+  Dashboard as DashboardIcon,
+  Assignment as TaskIcon,
+  People as PeopleIcon,
+  BarChart as AnalyticsIcon,
+  Settings as SettingsIcon,
+  Notifications as NotificationsIcon,
+  LightMode as LightModeIcon,
+  DarkMode as DarkModeIcon,
+  Logout as LogoutIcon,
+  Search as SearchIcon
+} from '@mui/icons-material';
+import { styled, alpha } from '@mui/material/styles';
+import { lightTheme, darkTheme } from '../../theme';
+
+// Kenar çubuğu genişliği
+const drawerWidth = 260;
+
+// Ana içerik alanı
+const Main = styled('main', { shouldForwardProp: (prop) => prop !== 'open' })<{
+  open?: boolean;
+}>(({ theme, open }) => ({
+  flexGrow: 1,
+  padding: 0,
+  paddingTop: 80, // Üst çubuğun yüksekliği + ekstra boşluk
+  transition: theme.transitions.create('margin', {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  marginLeft: 0,
+  ...(open && {
+    marginLeft: `${drawerWidth}px`,
+  }),
+  backgroundColor: theme.palette.mode === 'light' ? '#F7F9FC' : '#121212',
+  minHeight: '100vh',
+  width: '100%',
+  display: 'flex',
+  justifyContent: 'center',
+}));
+
+// Üst çubuk stili
+const AppBarStyled = styled(AppBar, {
+  shouldForwardProp: (prop) => prop !== 'open',
+})<{
+  open?: boolean;
+}>(({ theme, open }) => ({
+  boxShadow: 'none',
+  backdropFilter: 'blur(6px)',
+  WebkitBackdropFilter: 'blur(6px)', // Safari için
+  backgroundColor: alpha(theme.palette.background.default, 0.72),
+  borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+  transition: theme.transitions.create(['margin', 'width'], {
+    easing: theme.transitions.easing.sharp,
+    duration: theme.transitions.duration.leavingScreen,
+  }),
+  position: 'fixed',
+  zIndex: theme.zIndex.drawer + 1,
+  height: 64,
+  ...(open && {
+    width: `calc(100% - ${drawerWidth}px)`,
+    marginLeft: `${drawerWidth}px`,
+    transition: theme.transitions.create(['margin', 'width'], {
+      easing: theme.transitions.easing.easeOut,
+      duration: theme.transitions.duration.enteringScreen,
+    }),
+  }),
+}));
+
+// Kenar çubuğu başlık alanı
+const DrawerHeader = styled('div')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  padding: theme.spacing(2, 3),
+  ...theme.mixins.toolbar,
+  justifyContent: 'space-between',
+  height: 64,
+}));
+
+// Arama kutusu
+const Search = styled('div')(({ theme }) => ({
+  position: 'relative',
+  borderRadius: 20,
+  backgroundColor: alpha(theme.palette.common.white, 0.15),
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.common.white, 0.25),
+  },
+  marginRight: theme.spacing(2),
+  marginLeft: 0,
+  width: '100%',
+  maxWidth: 320,
+  [theme.breakpoints.up('sm')]: {
+    marginLeft: theme.spacing(3),
+    width: 'auto',
+  },
+}));
+
+const SearchIconWrapper = styled('div')(({ theme }) => ({
+  padding: theme.spacing(0, 2),
+  height: '100%',
+  position: 'absolute',
+  pointerEvents: 'none',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+}));
+
+const StyledInputBase = styled(InputBase)(({ theme }) => ({
+  color: 'inherit',
+  width: '100%',
+  '& .MuiInputBase-input': {
+    padding: theme.spacing(1, 1, 1, 0),
+    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
+    transition: theme.transitions.create('width'),
+    fontSize: 14,
+  }
+}));
+
+// Menü öğesi butonu
+const MenuButton = styled(Button)(({ theme }) => ({
+  borderRadius: 12,
+  justifyContent: 'flex-start',
+  padding: theme.spacing(1.2, 3),
+  marginBottom: theme.spacing(0.5),
+  textTransform: 'none',
+  fontWeight: 500,
+  fontSize: 14,
+  color: theme.palette.text.secondary,
+  '&.active': {
+    color: theme.palette.primary.main,
+    backgroundColor: alpha(theme.palette.primary.main, 0.08),
+    fontWeight: 600,
+    '& .MuiListItemIcon-root': {
+      color: theme.palette.primary.main,
+    },
+  },
+  '&:hover': {
+    backgroundColor: alpha(theme.palette.text.primary, 0.05),
+  },
+  '& .MuiListItemIcon-root': {
+    minWidth: 36,
+  },
+}));
+
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+  onLogout: () => void;
+  user: {
+    name: string;
+    email: string;
+    role: string;
+  };
+  onPageChange?: (page: string) => void;
+  onThemeToggle?: () => void;
+  darkMode?: boolean;
+}
+
+const menuItems = [
+  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
+  { text: 'Görevler', icon: <TaskIcon />, path: '/tasks' },
+  { text: 'Ekip', icon: <PeopleIcon />, path: '/team' },
+  { text: 'Analitik', icon: <AnalyticsIcon />, path: '/analytics' },
+  { text: 'Ayarlar', icon: <SettingsIcon />, path: '/settings' },
+];
+
+export default function DashboardLayout({ 
+  children, 
+  onLogout, 
+  user, 
+  onPageChange, 
+  onThemeToggle, 
+  darkMode: propDarkMode 
+}: DashboardLayoutProps) {
+  const theme = useTheme();
+  const [open, setOpen] = useState(true);
+  const [darkMode, setDarkMode] = useState(propDarkMode || false);
+  const [activePath, setActivePath] = useState('/dashboard');
+  
+  // Profil menüsü durumu
+  const [profileAnchorEl, setProfileAnchorEl] = useState<null | HTMLElement>(null);
+  const profileMenuOpen = Boolean(profileAnchorEl);
+  
+  // Bildirim menüsü durumu
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const notificationMenuOpen = Boolean(notificationAnchorEl);
+  
+  // Kenar çubuğunu aç
+  const handleDrawerOpen = () => {
+    setOpen(true);
+  };
+
+  // Kenar çubuğunu kapat
+  const handleDrawerClose = () => {
+    setOpen(false);
+  };
+  
+  // Profil menüsünü aç
+  const handleProfileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setProfileAnchorEl(event.currentTarget);
+  };
+  
+  // Profil menüsünü kapat
+  const handleProfileMenuClose = () => {
+    setProfileAnchorEl(null);
+  };
+  
+  // Bildirim menüsünü aç
+  const handleNotificationMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setNotificationAnchorEl(event.currentTarget);
+  };
+  
+  // Bildirim menüsünü kapat
+  const handleNotificationMenuClose = () => {
+    setNotificationAnchorEl(null);
+  };
+  
+  // Tema değiştirme
+  const handleThemeToggle = () => {
+    const newDarkMode = !darkMode;
+    setDarkMode(newDarkMode);
+    
+    if (onThemeToggle) {
+      onThemeToggle();
+    }
+  };
+  
+  // Menü öğesi tıklama
+  const handleMenuItemClick = (path: string) => {
+    setActivePath(path);
+    
+    if (onPageChange) {
+      onPageChange(path.replace('/', ''));
+    }
+  };
+  
+  return (
+    <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
+      <Box sx={{ display: 'flex', width: '100%' }}>
+        <CssBaseline />
+        
+        {/* Üst Çubuk - Apple/Shopify Tarzı */}
+        <AppBarStyled open={open}>
+          <Container maxWidth="lg" disableGutters>
+            <Toolbar sx={{ display: 'flex', justifyContent: 'space-between' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <IconButton
+                  color="inherit"
+                  aria-label="open drawer"
+                  onClick={handleDrawerOpen}
+                  edge="start"
+                  sx={{ mr: 2, ...(open && { display: 'none' }) }}
+                >
+                  <MenuIcon />
+                </IconButton>
+                
+                <Box 
+                  component="img"
+                  src="/images/logo.svg"
+                  alt="E-Pazarla Logo"
+                  sx={{ 
+                    height: 32, 
+                    width: 32, 
+                    mr: 1,
+                    display: { xs: 'none', sm: 'block' }
+                  }}
+                />
+                
+                <Typography 
+                  variant="h6" 
+                  noWrap 
+                  component="div"
+                  sx={{ 
+                    fontWeight: 600,
+                    letterSpacing: '-0.5px',
+                    display: { xs: 'none', sm: 'block' }
+                  }}
+                >
+                  E-Pazarla
+                </Typography>
+                
+                {/* Arama Kutusu */}
+                <Search>
+                  <SearchIconWrapper>
+                    <SearchIcon />
+                  </SearchIconWrapper>
+                  <StyledInputBase
+                    placeholder="Ara..."
+                    inputProps={{ 'aria-label': 'search' }}
+                  />
+                </Search>
+              </Box>
+              
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                {/* Tema Değiştirme */}
+                <Tooltip title={darkMode ? "Açık Tema" : "Koyu Tema"}>
+                  <IconButton 
+                    onClick={handleThemeToggle} 
+                    color="inherit"
+                    sx={{ 
+                      borderRadius: '12px',
+                      marginRight: 1
+                    }}
+                  >
+                    {darkMode ? <LightModeIcon /> : <DarkModeIcon />}
+                  </IconButton>
+                </Tooltip>
+                
+                {/* Bildirimler */}
+                <Tooltip title="Bildirimler">
+                  <IconButton 
+                    onClick={handleNotificationMenuOpen}
+                    color="inherit"
+                    sx={{ 
+                      borderRadius: '12px',
+                      marginRight: 1
+                    }}
+                  >
+                    <Badge badgeContent={4} color="error">
+                      <NotificationsIcon />
+                    </Badge>
+                  </IconButton>
+                </Tooltip>
+                
+                {/* Kullanıcı Profili */}
+                <Tooltip title="Hesap Ayarları">
+                  <IconButton
+                    onClick={handleProfileMenuOpen}
+                    size="small"
+                    sx={{ ml: 1 }}
+                    aria-controls={profileMenuOpen ? 'account-menu' : undefined}
+                    aria-haspopup="true"
+                    aria-expanded={profileMenuOpen ? 'true' : undefined}
+                  >
+                    <Avatar 
+                      sx={{ 
+                        width: 36, 
+                        height: 36,
+                        border: `2px solid ${theme.palette.primary.main}`
+                      }}
+                    >
+                      {user.name.charAt(0)}
+                    </Avatar>
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Toolbar>
+          </Container>
+        </AppBarStyled>
+        
+        {/* Profil Menüsü */}
+        <Menu
+          anchorEl={profileAnchorEl}
+          id="account-menu"
+          open={profileMenuOpen}
+          onClose={handleProfileMenuClose}
+          onClick={handleProfileMenuClose}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          sx={{
+            '& .MuiPaper-root': {
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.4)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              width: 220,
+              mt: 1.5
+            }
+          }}
+        >
+          <Box sx={{ px: 2, py: 1.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {user.name}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {user.email}
+            </Typography>
+          </Box>
+          <Divider />
+          <MenuItem onClick={handleMenuItemClick.bind(null, '/settings')} sx={{ py: 1.5 }}>
+            <Settings as SettingsIcon fontSize="small" sx={{ mr: 2 }} />
+            Hesap Ayarları
+          </MenuItem>
+          <MenuItem onClick={onLogout} sx={{ py: 1.5 }}>
+            <LogoutIcon fontSize="small" sx={{ mr: 2 }} />
+            Çıkış Yap
+          </MenuItem>
+        </Menu>
+        
+        {/* Bildirim Menüsü */}
+        <Menu
+          anchorEl={notificationAnchorEl}
+          id="notification-menu"
+          open={notificationMenuOpen}
+          onClose={handleNotificationMenuClose}
+          onClick={handleNotificationMenuClose}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+          sx={{
+            '& .MuiPaper-root': {
+              borderRadius: '16px',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 8px 16px 0 rgba(0,0,0,0.4)' 
+                : '0 8px 16px 0 rgba(0,0,0,0.1)',
+              width: 320,
+              mt: 1.5
+            }
+          }}
+        >
+          <Box sx={{ px: 2, py: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              Bildirimler
+            </Typography>
+            <Chip 
+              label="4 Yeni" 
+              size="small" 
+              color="primary" 
+              sx={{ height: 24, fontSize: '0.7rem' }}
+            />
+          </Box>
+          <Divider />
+          <MenuItem sx={{ py: 1.5 }}>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Yeni görev atandı
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Web sitesi SEO optimizasyonu
+              </Typography>
+            </Box>
+          </MenuItem>
+          <MenuItem sx={{ py: 1.5 }}>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Görev tamamlandı
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Sosyal medya içerik planı
+              </Typography>
+            </Box>
+          </MenuItem>
+          <MenuItem sx={{ py: 1.5 }}>
+            <Box>
+              <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                Yeni yorum
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Google Ads kampanyası
+              </Typography>
+            </Box>
+          </MenuItem>
+          <Divider />
+          <Box sx={{ p: 1.5, textAlign: 'center' }}>
+            <Button 
+              fullWidth 
+              variant="text" 
+              size="small" 
+              sx={{ textTransform: 'none', borderRadius: '8px' }}
+            >
+              Tüm Bildirimleri Gör
+            </Button>
+          </Box>
+        </Menu>
+        
+        {/* Kenar Çubuğu - Apple/Shopify Tarzı */}
+        <Drawer
+          sx={{
+            width: drawerWidth,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: drawerWidth,
+              boxSizing: 'border-box',
+              borderRight: 'none',
+              boxShadow: theme.palette.mode === 'dark' 
+                ? '0 0 15px rgba(0,0,0,0.4)' 
+                : '0 0 15px rgba(0,0,0,0.05)',
+              backgroundColor: theme.palette.background.paper,
+            },
+          }}
+          variant="persistent"
+          anchor="left"
+          open={open}
+        >
+          <DrawerHeader>
+            <Box 
+              sx={{ 
+                display: 'flex', 
+                alignItems: 'center',
+                py: 1.5
+              }}
+            >
+              <Box 
+                component="img"
+                src="/images/logo.svg"
+                alt="E-Pazarla Logo"
+                sx={{ height: 36, width: 36, mr: 1.5 }}
+              />
+              <Typography 
+                variant="h6" 
+                component="div" 
+                sx={{ 
+                  fontWeight: 600,
+                  letterSpacing: '-0.5px',
+                  fontSize: 20
+                }}
+              >
+                E-Pazarla
+              </Typography>
+            </Box>
+            <IconButton onClick={handleDrawerClose}>
+              <ChevronLeftIcon />
+            </IconButton>
+          </DrawerHeader>
+          
+          <Divider sx={{ mx: 2, mb: 2 }} />
+          
+          {/* Kullanıcı Profil Özeti */}
+          <Box sx={{ px: 3, mb: 3 }}>
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                p: 2, 
+                borderRadius: '16px',
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? alpha(theme.palette.common.white, 0.05) 
+                  : alpha(theme.palette.primary.light, 0.08),
+                display: 'flex',
+                alignItems: 'center'
+              }}
+            >
+              <Avatar 
+                sx={{ 
+                  width: 40, 
+                  height: 40, 
+                  mr: 1.5,
+                  border: `2px solid ${theme.palette.primary.main}`
+                }}
+              >
+                {user.name.charAt(0)}
+              </Avatar>
+              <Box>
+                <Typography variant="subtitle2" noWrap sx={{ fontWeight: 600 }}>
+                  {user.name}
+                </Typography>
+                <Typography variant="caption" color="text.secondary" noWrap>
+                  {user.role}
+                </Typography>
+              </Box>
+            </Paper>
+          </Box>
+          
+          {/* Menü Öğeleri */}
+          <Box sx={{ px: 2 }}>
+            <Typography 
+              variant="caption" 
+              color="text.secondary" 
+              sx={{ px: 1, mb: 1, display: 'block', fontWeight: 500 }}
+            >
+              MENÜ
+            </Typography>
+            
+            {menuItems.map((item) => (
+              <MenuButton
+                key={item.text}
+                fullWidth
+                startIcon={item.icon}
+                className={activePath === item.path ? 'active' : ''}
+                onClick={() => handleMenuItemClick(item.path)}
+              >
+                {item.text}
+              </MenuButton>
+            ))}
+          </Box>
+          
+          {/* Alt Bilgi */}
+          <Box sx={{ mt: 'auto', px: 3, pt: 2, pb: 3 }}>
+            <Paper 
+              elevation={0} 
+              sx={{ 
+                p: 2, 
+                borderRadius: '16px',
+                backgroundColor: theme.palette.mode === 'dark' 
+                  ? alpha(theme.palette.common.white, 0.05) 
+                  : alpha(theme.palette.primary.light, 0.08),
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 1 }}>
+                Yardıma mı ihtiyacınız var?
+              </Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ mb: 1.5, display: 'block' }}>
+                Destek ekibimiz sorularınızı yanıtlamaya hazır.
+              </Typography>
+              <Button 
+                variant="contained" 
+                size="small" 
+                fullWidth 
+                sx={{ 
+                  borderRadius: '10px', 
+                  textTransform: 'none',
+                  boxShadow: 'none'
+                }}
+              >
+                Destek Al
+              </Button>
+            </Paper>
+          </Box>
+        </Drawer>
+        
+        {/* Ana İçerik */}
+        <Main open={open}>
+          <Container 
+            maxWidth="lg" 
+            sx={{ 
+              py: 3,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center'
+            }}
+          >
+            {children}
+          </Container>
+        </Main>
+      </Box>
+    </ThemeProvider>
+  );
+}

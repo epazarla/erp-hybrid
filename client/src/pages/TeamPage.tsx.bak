@@ -1,0 +1,1301 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Avatar,
+  Chip,
+  Divider,
+  Paper,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  ListItemSecondaryAction,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+  Tabs,
+  Tab,
+  InputAdornment,
+  Tooltip,
+  Snackbar,
+  CircularProgress
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Mail as MailIcon,
+  Phone as PhoneIcon,
+  FilterList as FilterListIcon,
+  PersonAdd as PersonAddIcon,
+  ViewList as ViewListIcon,
+  ViewModule as ViewModuleIcon,
+  AccountCircle as AccountCircleIcon,
+  Login as LoginIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  HourglassEmpty as HourglassEmptyIcon,
+  Badge as BadgeIcon
+} from '@mui/icons-material';
+import notificationService, { NotificationType } from '../services/NotificationService';
+import UndoSnackbar from '../components/UndoSnackbar';
+import { 
+  syncTeamMembers, 
+  updateUserStatus, 
+  USER_STATUS, 
+  USERS_UPDATED_EVENT, 
+  setCurrentUser, 
+  getCurrentUser, 
+  USER_SWITCHED_EVENT,
+  getPendingApprovalUsers,
+  approveUser,
+  rejectUser,
+  USER_APPROVAL_REQUESTED_EVENT,
+  USER_APPROVED_EVENT,
+  USER_REJECTED_EVENT
+} from '../services/UserService';
+
+// Takım üyesi tipi
+interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  avatar?: string;
+  department: string;
+  status: 'active' | 'inactive' | 'vacation';
+  tasks: number;
+  completedTasks: number;
+}
+
+// Boş takım üyeleri listesi
+const mockTeamMembers: TeamMember[] = [];
+
+// Departman listesi
+const departments = [
+  'Tümü',
+  'Yönetim',
+  'Tasarım',
+  'Yazılım',
+  'Pazarlama',
+  'Müşteri Hizmetleri'
+];
+
+// Durum renkleri
+const statusColors = {
+  active: 'success',
+  inactive: 'error',
+  vacation: 'warning'
+};
+
+// Durum metinleri
+const statusTexts = {
+  active: 'Aktif',
+  inactive: 'Pasif',
+  vacation: 'İzinde'
+};
+
+// Görünüm tipleri
+type ViewType = 'grid' | 'list';
+
+// LocalStorage'dan ekip üyelerini yükle
+const loadTeamMembersFromStorage = (): TeamMember[] => {
+  try {
+    const savedMembers = localStorage.getItem('teamMembers');
+    if (savedMembers) {
+      return JSON.parse(savedMembers);
+    }
+  } catch (error) {
+    console.error('Ekip üyeleri yüklenirken hata oluştu:', error);
+  }
+  
+  // Ekip üyeleri yoksa boş dizi döndür
+  return mockTeamMembers;
+};
+
+// LocalStorage'a ekip üyelerini kaydet
+const saveTeamMembersToStorage = (members: TeamMember[]) => {
+  try {
+    localStorage.setItem('teamMembers', JSON.stringify(members));
+  } catch (error) {
+    console.error('Ekip üyeleri kaydedilirken hata oluştu:', error);
+  }
+};
+
+export default function TeamPage() {
+  // Temel state tanımlamaları
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(loadTeamMembersFromStorage());
+  const [filteredMembers, setFilteredMembers] = useState<TeamMember[]>(loadTeamMembersFromStorage());
+  const [currentUser, setCurrentUserState] = useState<TeamMember | null>(null);
+  const [pendingApprovalUsers, setPendingApprovalUsers] = useState<any[]>([]);
+  
+  // UI state tanımlamaları
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('Tümü');
+  const [viewType, setViewType] = useState<ViewType>('grid');
+  
+  // Kullanıcı işlemleri için state tanımlamaları
+  const [switchUserSnackbar, setSwitchUserSnackbar] = useState<{open: boolean, message: string}>({open: false, message: ''});
+  
+  // Form state tanımlamaları
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState<boolean>(false);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [newMember, setNewMember] = useState<TeamMember>({
+    id: 0,
+    name: '',
+    role: '',
+    email: '',
+    phone: '',
+    department: '',
+    status: 'active',
+    tasks: 0,
+    completedTasks: 0
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  
+  // Silme işlemleri için state tanımlamaları
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
+  const [deletedMember, setDeletedMember] = useState<TeamMember | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>('');
+  
+  // Ekip üyelerini UserService ile senkronize et ve mevcut kullanıcıyı yükle
+  useEffect(() => {
+    // Ekip üyelerini UserService'e gönder
+    if (teamMembers.length > 0) {
+      syncTeamMembers(teamMembers);
+      console.log('Ekip üyeleri UserService ile senkronize edildi', teamMembers);
+      
+      // Mevcut kullanıcıyı yükle
+      const user = getCurrentUser();
+      if (user) {
+        const currentTeamMember = teamMembers.find(m => m.id === user.id);
+        if (currentTeamMember) {
+          setCurrentUserState(currentTeamMember);
+        }
+      }
+    }
+    
+    // Onay bekleyen kullanıcıları yükle
+    loadPendingApprovalUsers();
+    
+    // Kullanıcı güncellemelerini dinle
+    const handleUsersUpdated = () => {
+      console.log('Kullanıcılar güncellendi');
+      loadPendingApprovalUsers();
+    };
+    
+    // Kullanıcı değişikliklerini dinle
+    const handleUserSwitched = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const user = customEvent.detail?.user;
+      if (user) {
+        const teamMember = teamMembers.find(m => m.id === user.id);
+        if (teamMember) {
+          setCurrentUserState(teamMember);
+          setSwitchUserSnackbar({
+            open: true,
+            message: `${teamMember.name} olarak giriş yapıldı`
+          });
+        }
+      }
+    };
+    
+    // Onay bekleyen kullanıcı olduğunda bildirim
+    const handleUserApprovalRequested = () => {
+      loadPendingApprovalUsers();
+      notificationService.showNotification(
+        'Yeni bir kullanıcı onay bekliyor',
+        NotificationType.INFO
+      );
+    };
+    
+    window.addEventListener(USERS_UPDATED_EVENT, handleUsersUpdated);
+    window.addEventListener(USER_SWITCHED_EVENT, handleUserSwitched);
+    window.addEventListener(USER_APPROVAL_REQUESTED_EVENT, handleUserApprovalRequested);
+    
+    return () => {
+      window.removeEventListener(USERS_UPDATED_EVENT, handleUsersUpdated);
+      window.removeEventListener(USER_SWITCHED_EVENT, handleUserSwitched);
+      window.removeEventListener(USER_APPROVAL_REQUESTED_EVENT, handleUserApprovalRequested);
+    };
+  }, [teamMembers]);
+  
+  // Onay bekleyen kullanıcıları yükle
+  const loadPendingApprovalUsers = () => {
+    const pendingUsers = getPendingApprovalUsers();
+    setPendingApprovalUsers(pendingUsers as TeamMember[]);
+  };
+
+  const [filteredMembers, setFilteredMembers] = useState<TeamMember[]>(loadTeamMembersFromStorage());
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDepartment, setSelectedDepartment] = useState('Tümü');
+  const [viewType, setViewType] = useState<ViewType>('grid');
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState(false);
+  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null);
+  const [isEditMode, setIsEditMode] = useState(false);
+  
+  // Silme onay diyaloğu state'leri
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [memberToDelete, setMemberToDelete] = useState<{id: number, name: string} | null>(null);
+  
+  // Kullanıcı değiştirme fonksiyonu
+  const handleSwitchUser = (member: TeamMember) => {
+    // Kullanıcı durumu aktif değilse uyarı ver
+    if (member.status !== 'active') {
+      notificationService.showNotification(
+        `${member.name} hesabı aktif değil. Sadece aktif kullanıcılara geçiş yapabilirsiniz.`,
+        NotificationType.WARNING
+      );
+      return;
+    }
+    
+    // Kullanıcıyı değiştir
+    setCurrentUser(member);
+  };
+  
+  // Kullanıcıyı onayla
+  const handleApproveUser = (userId: number) => {
+    if (!currentUser) {
+      notificationService.showNotification(
+        'Kullanıcı onaylamak için giriş yapmalısınız',
+        NotificationType.WARNING
+      );
+      return;
+    }
+    
+    const success = approveUser(userId, currentUser.id);
+    
+    if (success) {
+      notificationService.showNotification(
+        'Kullanıcı başarıyla onaylandı',
+        NotificationType.SUCCESS
+      );
+      
+      // Onay bekleyen kullanıcıları güncelle
+      loadPendingApprovalUsers();
+      
+      // Ekip üyelerini yeniden yükle
+      const updatedMembers = loadTeamMembersFromStorage();
+      setTeamMembers(updatedMembers);
+    } else {
+      notificationService.showNotification(
+        'Kullanıcı onaylanırken bir hata oluştu',
+        NotificationType.ERROR
+      );
+    }
+  };
+  
+  // Kullanıcı onayını reddet
+  const handleRejectUser = (userId: number) => {
+    if (!currentUser) {
+      notificationService.showNotification(
+        'Kullanıcı reddetmek için giriş yapmalısınız',
+        NotificationType.WARNING
+      );
+      return;
+    }
+    
+    const success = rejectUser(userId, currentUser.id);
+    
+    if (success) {
+      notificationService.showNotification(
+        'Kullanıcı başvurusu reddedildi',
+        NotificationType.SUCCESS
+      );
+      
+      // Onay bekleyen kullanıcıları güncelle
+      loadPendingApprovalUsers();
+    } else {
+      notificationService.showNotification(
+        'Kullanıcı reddedilirken bir hata oluştu',
+        NotificationType.ERROR
+      );
+    }
+  };
+
+  // Form hata durumları
+  const [formErrors, setFormErrors] = useState<{
+    name?: string;
+    role?: string;
+    email?: string;
+    phone?: string;
+    department?: string;
+  }>({});
+
+  // Form gönderim durumu
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  // Silme ve geri alma state'leri
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
+  const [deletedMember, setDeletedMember] = useState<TeamMember | null>(null);
+  
+  // Yeni üye form durumu
+  const [newMember, setNewMember] = useState<Omit<TeamMember, 'id' | 'tasks' | 'completedTasks'>>({
+    name: '',
+    role: '',
+    email: '',
+    phone: '',
+    avatar: '',
+    department: 'Yazılım',
+    status: 'active'
+  });
+
+  // Arama ve filtreleme
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    applyFilters(query, selectedDepartment);
+  };
+
+  // Departman filtresi
+  const handleDepartmentChange = (department: string) => {
+    setSelectedDepartment(department);
+    applyFilters(searchQuery, department);
+  };
+
+  // Filtreleri uygula
+  const applyFilters = (query: string, department: string) => {
+    let filtered = [...teamMembers];
+    
+    // Arama filtresi
+    if (query) {
+      filtered = filtered.filter(member => 
+        member.name.toLowerCase().includes(query.toLowerCase()) ||
+        member.role.toLowerCase().includes(query.toLowerCase()) ||
+        member.email.toLowerCase().includes(query.toLowerCase())
+      );
+    }
+    
+    // Departman filtresi
+    if (department !== 'Tümü') {
+      filtered = filtered.filter(member => member.department === department);
+    }
+    
+    setFilteredMembers(filtered);
+  };
+
+  // Üye ekleme modalını aç
+  const handleOpenAddMember = () => {
+    setIsAddMemberOpen(true);
+    setIsEditMode(false);
+    setNewMember({
+      name: '',
+      role: '',
+      email: '',
+      phone: '',
+      avatar: '',
+      department: 'Yazılım',
+      status: 'active'
+    });
+  };
+
+  // Üye düzenleme modalını aç
+  const handleEditMember = (member: TeamMember) => {
+    setSelectedMember(member);
+    setIsEditMode(true);
+    setNewMember({
+      name: member.name,
+      role: member.role,
+      email: member.email,
+      phone: member.phone,
+      avatar: member.avatar || '',
+      department: member.department,
+      status: member.status
+    });
+    setIsAddMemberOpen(true);
+  };
+
+  // Form alanlarını güncelle
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<string | 'active' | 'inactive' | 'vacation'>) => {
+    const { name, value } = e.target;
+    if (name) {
+      console.log(`Form field updated: ${name} = ${value}`);
+      
+      // Alanı güncelle
+      setNewMember({
+        ...newMember,
+        [name]: value
+      });
+      
+      // Alan değiştiğinde ilgili hata mesajını temizle
+      if (formErrors[name as keyof typeof formErrors]) {
+        setFormErrors({
+          ...formErrors,
+          [name]: undefined
+        });
+      }
+    }
+  };
+
+  // Form doğrulama
+  const validateForm = () => {
+    const errors: {
+      name?: string;
+      role?: string;
+      email?: string;
+      phone?: string;
+      department?: string;
+    } = {};
+    let isValid = true;
+    
+    // Ad alanı kontrolü
+    if (!newMember.name || newMember.name.trim() === '') {
+      errors.name = 'Ad soyad alanı zorunludur';
+      isValid = false;
+    } else if (newMember.name.length < 3) {
+      errors.name = 'Ad soyad en az 3 karakter olmalıdır';
+      isValid = false;
+    }
+    
+    // Rol alanı kontrolü
+    if (!newMember.role || newMember.role.trim() === '') {
+      errors.role = 'Rol/pozisyon alanı zorunludur';
+      isValid = false;
+    }
+    
+    // E-posta formatını kontrol et
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!newMember.email || newMember.email.trim() === '') {
+      errors.email = 'E-posta alanı zorunludur';
+      isValid = false;
+    } else if (!emailRegex.test(newMember.email)) {
+      errors.email = 'Geçerli bir e-posta adresi girin';
+      isValid = false;
+    }
+    
+    // Telefon formatını kontrol et
+    const phoneRegex = /^\+?[0-9\s-]{10,15}$/;
+    if (!newMember.phone || newMember.phone.trim() === '') {
+      errors.phone = 'Telefon alanı zorunludur';
+      isValid = false;
+    } else if (!phoneRegex.test(newMember.phone)) {
+      errors.phone = 'Geçerli bir telefon numarası girin';
+      isValid = false;
+    }
+    
+    // Departman kontrolü
+    if (!newMember.department || newMember.department === '') {
+      errors.department = 'Departman seçimi zorunludur';
+      isValid = false;
+    }
+    
+    setFormErrors(errors);
+    
+    if (!isValid) {
+      notificationService.showNotification(
+        'Form Hatası',
+        'Lütfen form alanlarını kontrol edin.',
+        { type: NotificationType.ERROR }
+      );
+    }
+    
+    return isValid;
+  };
+
+  // Üye ekle/düzenle
+  const handleSaveMember = () => {
+    console.log('Üye kaydetme işlemi başlatıldı', newMember);
+    
+    // İşlem zaten devam ediyorsa çık
+    if (isSubmitting) {
+      return;
+    }
+    
+    // Form doğrulama
+    if (!validateForm()) {
+      return;
+    }
+    
+    // Gönderim durumunu başlat
+    setIsSubmitting(true);
+    
+    try {
+      if (isEditMode && selectedMember) {
+        // Mevcut üyeyi güncelle
+        const updatedMembers = teamMembers.map(member => 
+          member.id === selectedMember.id ? { 
+            ...member, 
+            ...newMember
+          } : member
+        );
+        setTeamMembers(updatedMembers);
+        
+        // LocalStorage'a kaydet
+        saveTeamMembersToStorage(updatedMembers);
+        
+        // Kullanıcı servisi ile senkronize et
+        syncTeamMembers(updatedMembers);
+        
+        setFilteredMembers(updatedMembers.filter(member => {
+          // Arama ve departman filtrelerini uygula
+          const matchesSearch = !searchQuery || 
+            member.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            member.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            member.email.toLowerCase().includes(searchQuery.toLowerCase());
+          
+          const matchesDepartment = selectedDepartment === 'Tümü' || 
+            member.department === selectedDepartment;
+          
+          return matchesSearch && matchesDepartment;
+        }));
+        
+        // Bildirim göster
+        notificationService.showNotification(
+          'Ekip Üyesi Güncellendi',
+          `${newMember.name} bilgileri güncellendi.`,
+          { type: NotificationType.SUCCESS }
+        );
+      } else {
+        // Yeni üye ekle
+        const newId = teamMembers.length > 0 ? Math.max(...teamMembers.map(m => m.id)) + 1 : 1;
+        const memberToAdd: TeamMember = {
+          id: newId,
+          ...newMember,
+          tasks: 0,
+          completedTasks: 0
+        };
+        
+        console.log('Eklenecek yeni üye:', memberToAdd);
+        
+        const updatedMembers = [...teamMembers, memberToAdd];
+        setTeamMembers(updatedMembers);
+        
+        // LocalStorage'a kaydet
+        saveTeamMembersToStorage(updatedMembers);
+        
+        // Filtreleri uygula
+        const shouldShow = (
+          (selectedDepartment === 'Tümü' || memberToAdd.department === selectedDepartment) &&
+          (!searchQuery || 
+            memberToAdd.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            memberToAdd.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            memberToAdd.email.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+        
+        if (shouldShow) {
+          setFilteredMembers([...filteredMembers, memberToAdd]);
+        }
+        
+        // Bildirim göster
+        notificationService.showNotification(
+          'Yeni Ekip Üyesi',
+          `${newMember.name} ekibe eklendi.`,
+          { type: NotificationType.SUCCESS }
+        );
+      }
+      
+      setIsAddMemberOpen(false);
+      setIsSubmitting(false);
+    } catch (error) {
+      console.error('Üye kaydetme hatası:', error);
+      notificationService.showNotification(
+        'İşlem Hatası',
+        'Ekip üyesi kaydedilirken bir hata oluştu.',
+        { type: NotificationType.ERROR }
+      );
+      setIsSubmitting(false);
+    }
+  };
+
+  // Silme onay diyaloğunu aç
+  const handleDeleteConfirmation = (id: number, name: string) => {
+    setMemberToDelete({id, name});
+    setDeleteDialogOpen(true);
+  };
+  
+  // Silme onay diyaloğunu kapat
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setMemberToDelete(null);
+  };
+  
+  // Tüm ekip üyelerini temizle
+  const handleClearAllMembers = () => {
+    // Silme onayı iste
+    setDeleteDialogOpen(true);
+    setMemberToDelete(null);
+  };
+  
+  // Tüm ekip üyelerini temizle (onay sonrası)
+  const confirmClearAllMembers = () => {
+    // Tüm üyeleri temizle
+    setTeamMembers([]);
+    setFilteredMembers([]);
+    
+    // LocalStorage'dan temizle
+    localStorage.removeItem('teamMembers');
+    
+    // UserService ile senkronize et
+    syncTeamMembers([]);
+    
+    // Diyaloğu kapat
+    setDeleteDialogOpen(false);
+    
+    // Bildirim göster
+    notificationService.showNotification(
+      'Ekip Temizlendi',
+      'Tüm ekip üyeleri başarıyla silindi.',
+      { type: NotificationType.INFO }
+    );
+  };
+  
+  // Üye sil
+  const handleDeleteMember = () => {
+    if (!memberToDelete) return;
+    
+    const id = memberToDelete.id;
+    const name = memberToDelete.name;
+    
+    // Silinen üyeyi kaydet
+    const memberToRemove = teamMembers.find(member => member.id === id);
+    if (memberToRemove) {
+      setDeletedMember(memberToRemove);
+    }
+    
+    const updatedMembers = teamMembers.filter(member => member.id !== id);
+    setTeamMembers(updatedMembers);
+    setFilteredMembers(filteredMembers.filter(member => member.id !== id));
+    
+    // LocalStorage'a kaydet
+    saveTeamMembersToStorage(updatedMembers);
+    
+    // Snackbar'la bildirim göster
+    setSnackbarMessage(`${name} ekipten çıkarıldı.`);
+    setSnackbarOpen(true);
+    
+    // Diyaloğu kapat
+    handleCloseDeleteDialog();
+  };
+  
+  // Silinen üyeyi geri al
+  const handleUndoDelete = () => {
+    if (!deletedMember) return;
+    
+    // Silinen üyeyi geri ekle
+    const updatedMembers = [...teamMembers, deletedMember];
+    setTeamMembers(updatedMembers);
+    
+    // Filtreleri uygula
+    const shouldShow = (
+      (selectedDepartment === 'Tümü' || deletedMember.department === selectedDepartment) &&
+      (!searchQuery || 
+        deletedMember.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        deletedMember.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        deletedMember.email.toLowerCase().includes(searchQuery.toLowerCase()))
+    );
+    
+    if (shouldShow) {
+      setFilteredMembers([...filteredMembers, deletedMember]);
+    }
+    
+    // LocalStorage'a kaydet
+    saveTeamMembersToStorage(updatedMembers);
+    
+    // Bildirim göster
+    notificationService.showNotification(
+      'Ekip Üyesi Geri Alındı',
+      `${deletedMember.name} ekibe geri eklendi.`,
+      { type: NotificationType.SUCCESS }
+    );
+    
+    // Snackbar'ı kapat
+    setSnackbarOpen(false);
+    setDeletedMember(null);
+  };
+  
+  // Snackbar kapatma işlevi
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+    setDeletedMember(null);
+  };
+  
+  // Grid görünümü
+  const renderGridView = () => {
+    return (
+      <Grid container spacing={3}>
+        {filteredMembers.map(member => (
+          <Grid item xs={12} sm={6} md={4} lg={3} key={member.id}>
+            <Card sx={{ 
+              height: '100%', 
+              display: 'flex', 
+              flexDirection: 'column',
+              position: 'relative',
+              border: currentUser?.id === member.id ? '2px solid #2196f3' : 'none',
+              boxShadow: currentUser?.id === member.id ? '0 0 10px rgba(33, 150, 243, 0.5)' : 'inherit'
+            }}>
+              {currentUser?.id === member.id && (
+                <Box 
+                  sx={{ 
+                    position: 'absolute', 
+                    top: 0, 
+                    right: 0, 
+                    bgcolor: 'primary.main', 
+                    color: 'white',
+                    px: 1,
+                    py: 0.5,
+                    borderBottomLeftRadius: 8,
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold',
+                    zIndex: 1
+                  }}
+                >
+                  Aktif Kullanıcı
+                </Box>
+              )}
+              <CardContent sx={{ flexGrow: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
+                  <Avatar 
+                    src={member.avatar} 
+                    sx={{ width: 64, height: 64, mb: 2 }}
+                  >
+                    {member.name.charAt(0)}
+                  </Avatar>
+                  <Box>
+                    <Chip 
+                      label={statusTexts[member.status]} 
+                      color={statusColors[member.status] as any} 
+                      size="small" 
+                      sx={{ mb: 1 }}
+                    />
+                  </Box>
+                </Box>
+                
+                <Typography variant="h6" component="h2" gutterBottom>
+                  {member.name}
+                </Typography>
+                
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {member.role}
+                </Typography>
+                
+                <Typography variant="body2" color="text.secondary" gutterBottom>
+                  {member.department}
+                </Typography>
+                
+                <Box sx={{ mt: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                    <MailIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                    <Typography variant="body2">{member.email}</Typography>
+                  </Box>
+                    
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <PhoneIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                    <Typography variant="body2">{member.phone}</Typography>
+                  </Box>
+                </Box>
+              </CardContent>
+              
+              <CardActions sx={{ justifyContent: 'space-between' }}>
+                <Box>
+                  <Button 
+                    size="small" 
+                    startIcon={<EditIcon />} 
+                    onClick={() => handleEditMember(member)}
+                  >
+                    Düzenle
+                  </Button>
+                  <Button 
+                    size="small" 
+                    color="error" 
+                    startIcon={<DeleteIcon />} 
+                    onClick={() => handleDeleteConfirmation(member.id, member.name)}
+                  >
+                    Sil
+                  </Button>
+                </Box>
+                <Button
+                  size="small"
+                  color="primary"
+                  variant={currentUser?.id === member.id ? "contained" : "outlined"}
+                  startIcon={<LoginIcon />}
+                  onClick={() => handleSwitchUser(member)}
+                  disabled={member.status !== 'active'}
+                  title={member.status !== 'active' ? 'Sadece aktif kullanıcılara geçiş yapabilirsiniz' : ''}
+                >
+                  {currentUser?.id === member.id ? 'Aktif' : 'Giriş Yap'}
+                </Button>
+              </CardActions>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    ))}
+  </Grid>
+);
+};
+
+// Liste görünümü
+const renderListView = () => {
+  return (
+    <List sx={{ bgcolor: 'background.paper' }}>
+      {filteredMembers.map(member => (
+        <React.Fragment key={member.id}>
+          <ListItem
+            sx={{
+              bgcolor: currentUser?.id === member.id ? 'rgba(33, 150, 243, 0.1)' : 'inherit',
+              borderLeft: currentUser?.id === member.id ? '4px solid #2196f3' : 'none'
+            }}
+            secondaryAction={
+              <Box>
+                <Button
+                  size="small"
+                  color="primary"
+                  variant={currentUser?.id === member.id ? "contained" : "outlined"}
+                  startIcon={<LoginIcon />}
+                  onClick={() => handleSwitchUser(member)}
+                  disabled={member.status !== 'active'}
+                  sx={{ mr: 1 }}
+                >
+                  {currentUser?.id === member.id ? 'Aktif' : 'Giriş Yap'}
+                </Button>
+                <IconButton edge="end" aria-label="edit" onClick={() => handleEditMember(member)}>
+                  <EditIcon />
+                </IconButton>
+                <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteConfirmation(member.id, member.name)}>
+                  <DeleteIcon />
+                </IconButton>
+              </Box>
+            }
+          >
+            <ListItemAvatar>
+              <Avatar src={member.avatar}>
+                {member.name.charAt(0)}
+              </Avatar>
+            </ListItemAvatar>
+            <ListItemText
+              primary={
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="subtitle1" component="span">
+                    {member.name}
+                  </Typography>
+                  <Chip 
+                    label={statusTexts[member.status]} 
+                    color={statusColors[member.status] as any} 
+                    size="small" 
+                    sx={{ ml: 1 }}
+                  />
+                  {currentUser?.id === member.id && (
+                    <Chip 
+                      label="Aktif Kullanıcı" 
+                      color="primary" 
+                      size="small" 
+                      sx={{ ml: 1 }}
+                    />
+                  )}
+                </Box>
+              }
+              secondary={
+                <>
+                  <Typography component="span" variant="body2" color="text.primary">
+                    {member.role} - {member.department}
+                  </Typography>
+                  <Typography component="div" variant="body2">
+                    {member.email} | {member.phone}
+                  </Typography>
+                </>
+              }
+            />
+          </ListItem>
+          <Divider variant="inset" component="li" />
+        </React.Fragment>
+      ))}
+    </List>
+  );
+};
+
+return (
+  <Box sx={{ width: '100%' }}>
+    <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Box sx={{ display: 'flex', alignItems: 'center' }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Ekip Yönetimi
+        </Typography>
+        {currentUser && (
+          <Chip
+            icon={<AccountCircleIcon />}
+            label={`Aktif Kullanıcı: ${currentUser.name}`}
+          </Typography>
+          {currentUser && (
+            <Chip
+              icon={<AccountCircleIcon />}
+              label={`Aktif Kullanıcı: ${currentUser.name}`}
+              color="primary"
+              variant="outlined"
+              sx={{ ml: 2 }}
+            />
+          )}
+          {pendingApprovalUsers.length > 0 && (
+            <Chip
+              icon={<HourglassEmptyIcon />}
+              label={`Onay Bekleyen: ${pendingApprovalUsers.length}`}
+              color="warning"
+              variant="outlined"
+              sx={{ ml: 2 }}
+            />
+          )}
+        </Box>
+        <Box>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PersonAddIcon />}
+            onClick={handleOpenAddMember}
+            sx={{ mr: 1 }}
+          >
+            Yeni Üye Ekle
+          </Button>
+          <Button
+            variant="outlined"
+            color="error"
+            onClick={handleClearAllMembers}
+            disabled={teamMembers.length === 0}
+          >
+            Tümünü Temizle
+          </Button>
+        </Box>
+      </Box>
+      
+      {/* Onay Bekleyen Kullanıcılar */}
+      {pendingApprovalUsers.length > 0 && (
+        <Paper sx={{ p: 2, mb: 3, bgcolor: 'warning.light' }}>
+          <Box sx={{ mb: 2 }}>
+            <Typography variant="h6" component="h2" sx={{ display: 'flex', alignItems: 'center' }}>
+              <BadgeIcon sx={{ mr: 1 }} />
+              Onay Bekleyen Kullanıcılar
+            </Typography>
+          </Box>
+          
+          <Grid container spacing={2}>
+            {pendingApprovalUsers.map(user => (
+              <Grid item xs={12} sm={6} md={4} key={user.id}>
+                <Card sx={{ bgcolor: 'background.paper' }}>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Avatar src={user.avatar} sx={{ mr: 2 }}>
+                        {user.name.charAt(0)}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="subtitle1">{user.name}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {user.role} - {user.department}
+                        </Typography>
+                      </Box>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <MailIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                      <Typography variant="body2">{user.email}</Typography>
+                    </Box>
+                    
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <PhoneIcon fontSize="small" sx={{ mr: 1, color: 'text.secondary' }} />
+                      <Typography variant="body2">{user.phone}</Typography>
+                    </Box>
+                  </CardContent>
+                  
+                  <CardActions>
+                    <Button
+                      size="small"
+                      color="success"
+                      startIcon={<CheckCircleIcon />}
+                      onClick={() => handleApproveUser(user.id)}
+                    >
+                      Onayla
+                    </Button>
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<CancelIcon />}
+                      onClick={() => handleRejectUser(user.id)}
+                    >
+                      Reddet
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
+      )}
+    {/* Geri Alma Snackbar'ı */}
+    <UndoSnackbar
+      open={snackbarOpen}
+      message={snackbarMessage}
+      onClose={handleCloseSnackbar}
+      onUndo={handleUndoDelete}
+    />
+      
+      <Box sx={{ p: 3 }}>
+        <Paper sx={{ p: 2, mb: 3 }}>
+          <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={6}>
+            <TextField
+              fullWidth
+              placeholder="İsim, pozisyon veya e-posta ara..."
+              value={searchQuery}
+              onChange={handleSearch}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                )
+              }}
+              size="small"
+            />
+          </Grid>
+          
+          <Grid item xs={12} md={4}>
+            <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+              {departments.map(department => (
+                <Chip
+                  key={department}
+                  label={department}
+                  onClick={() => handleDepartmentChange(department)}
+                  color={selectedDepartment === department ? 'primary' : 'default'}
+                  variant={selectedDepartment === department ? 'filled' : 'outlined'}
+                />
+              ))}
+            </Box>
+          </Grid>
+          
+          <Grid item xs={12} md={2}>
+            <Tabs
+              value={viewType}
+              onChange={(_, newValue) => setViewType(newValue)}
+              sx={{ minHeight: 'auto' }}
+            >
+              <Tab icon={<FilterListIcon />} value="grid" />
+              <Tab icon={<ViewListIcon />} value="list" />
+            </Tabs>
+          </Grid>
+        </Grid>
+      </Paper>
+      
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'flex-end' }}>
+        <Tabs
+          value={viewType}
+          onChange={(e, newValue) => setViewType(newValue as ViewType)}
+          indicatorColor="primary"
+          textColor="primary"
+        >
+          <Tab 
+            value="grid" 
+            label="Grid Görünüm" 
+            icon={<ViewModuleIcon />} 
+            iconPosition="start"
+          />
+          <Tab 
+            value="list" 
+            label="Liste Görünüm" 
+            icon={<ViewListIcon />} 
+            iconPosition="start"
+          />
+        </Tabs>
+      </Box>
+      
+      {viewType === 'grid' ? renderGridView() : renderListView()}
+      </Box>
+      
+      {/* Üye Ekleme/Düzenleme Modalı */}
+      <Dialog open={isAddMemberOpen} onClose={() => setIsAddMemberOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>
+          {isEditMode ? 'Ekip Üyesi Düzenle' : 'Yeni Ekip Üyesi Ekle'}
+        </DialogTitle>
+        
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Ad Soyad"
+                name="name"
+                value={newMember.name}
+                onChange={handleFormChange}
+                fullWidth
+                autoFocus
+                error={!!formErrors.name}
+                helperText={formErrors.name}
+                required
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Rol / Pozisyon"
+                name="role"
+                value={newMember.role}
+                onChange={handleFormChange}
+                fullWidth
+                error={!!formErrors.role}
+                helperText={formErrors.role}
+                required
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="E-posta"
+                name="email"
+                value={newMember.email}
+                onChange={handleFormChange}
+                fullWidth
+                type="email"
+                error={!!formErrors.email}
+                helperText={formErrors.email}
+                required
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Telefon"
+                name="phone"
+                value={newMember.phone}
+                onChange={handleFormChange}
+                fullWidth
+                placeholder="+90 555 123 4567"
+                error={!!formErrors.phone}
+                helperText={formErrors.phone}
+                required
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth error={!!formErrors.department} required>
+                <InputLabel>Departman</InputLabel>
+                <Select
+                  name="department"
+                  value={newMember.department}
+                  onChange={handleFormChange}
+                  label="Departman"
+                >
+                  {departments.filter(d => d !== 'Tümü').map(department => (
+                    <MenuItem key={department} value={department}>
+                      {department}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {formErrors.department && (
+                  <Typography color="error" variant="caption" sx={{ mt: 0.5, ml: 1.5 }}>
+                    {formErrors.department}
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Durum</InputLabel>
+                <Select
+                  name="status"
+                  value={newMember.status}
+                  onChange={handleFormChange}
+                  label="Durum"
+                >
+                  <MenuItem value="active">Aktif</MenuItem>
+                  <MenuItem value="inactive">Pasif</MenuItem>
+                  <MenuItem value="vacation">İzinde</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                label="Profil Resmi URL"
+                name="avatar"
+                value={newMember.avatar}
+                onChange={handleFormChange}
+                fullWidth
+                placeholder="https://example.com/avatar.jpg"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        
+        <DialogActions>
+          <Button 
+            onClick={() => setIsAddMemberOpen(false)} 
+            color="inherit"
+            disabled={isSubmitting}
+          >
+            İptal
+          </Button>
+          <Button 
+            onClick={handleSaveMember} 
+            variant="contained"
+            disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isEditMode ? 'Güncelle' : 'Ekle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Kullanıcı değişikliği bildirim snackbar */}
+      <Snackbar
+        open={switchUserSnackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSwitchUserSnackbar({...switchUserSnackbar, open: false})}
+        message={switchUserSnackbar.message}
+        action={
+          <Button color="inherit" size="small" onClick={() => setSwitchUserSnackbar({...switchUserSnackbar, open: false})}>
+            TAMAM
+          </Button>
+        }
+      />
+      
+      {/* Silme Onay Diyaloğu */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          {memberToDelete ? 'Ekip Üyesini Sil' : 'Tüm Ekip Üyelerini Sil'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="delete-dialog-description">
+            {memberToDelete ? (
+              <><b>{memberToDelete.name}</b> adlı ekip üyesini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</>
+            ) : (
+              <>Tüm ekip üyelerini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.</>
+            )}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} color="primary">
+            İptal
+          </Button>
+          <Button 
+            onClick={memberToDelete ? handleDeleteMember : confirmClearAllMembers} 
+            color="error" 
+            variant="contained"
+          >
+            {memberToDelete ? 'Sil' : 'Tümünü Sil'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </Box>
+  );
+}

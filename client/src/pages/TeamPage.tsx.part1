@@ -1,0 +1,139 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Box,
+  Typography,
+  Button,
+  TextField,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
+  Grid,
+  Card,
+  CardContent,
+  CardActions,
+  Avatar,
+  Chip,
+  Divider,
+  Paper,
+  List,
+  ListItem,
+  ListItemAvatar,
+  ListItemText,
+  ListItemSecondaryAction,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  SelectChangeEvent,
+  Tabs,
+  Tab,
+  InputAdornment,
+  Tooltip,
+  Snackbar,
+  CircularProgress
+} from '@mui/material';
+import {
+  Search as SearchIcon,
+  Add as AddIcon,
+  Edit as EditIcon,
+  Delete as DeleteIcon,
+  Mail as MailIcon,
+  Phone as PhoneIcon,
+  FilterList as FilterListIcon,
+  PersonAdd as PersonAddIcon,
+  ViewList as ViewListIcon,
+  ViewModule as ViewModuleIcon,
+  AccountCircle as AccountCircleIcon,
+  Login as LoginIcon,
+  CheckCircle as CheckCircleIcon,
+  Cancel as CancelIcon,
+  HourglassEmpty as HourglassEmptyIcon,
+  Badge as BadgeIcon
+} from '@mui/icons-material';
+import notificationService, { NotificationType } from '../services/NotificationService';
+import UndoSnackbar from '../components/UndoSnackbar';
+import { 
+  syncTeamMembers, 
+  updateUserStatus, 
+  USER_STATUS, 
+  USERS_UPDATED_EVENT, 
+  setCurrentUser, 
+  getCurrentUser, 
+  USER_SWITCHED_EVENT,
+  getPendingApprovalUsers,
+  approveUser,
+  rejectUser,
+  USER_APPROVAL_REQUESTED_EVENT,
+  USER_APPROVED_EVENT,
+  USER_REJECTED_EVENT
+} from '../services/UserService';
+
+// Takım üyesi tipi
+interface TeamMember {
+  id: number;
+  name: string;
+  role: string;
+  email: string;
+  phone: string;
+  avatar?: string;
+  department: string;
+  status: 'active' | 'inactive' | 'vacation';
+  tasks: number;
+  completedTasks: number;
+}
+
+// Boş takım üyeleri listesi
+const mockTeamMembers: TeamMember[] = [];
+
+// Departman listesi
+const departments = [
+  'Tümü',
+  'Yönetim',
+  'Tasarım',
+  'Yazılım',
+  'Pazarlama',
+  'Müşteri Hizmetleri'
+];
+
+// Durum renkleri
+const statusColors = {
+  active: 'success',
+  inactive: 'error',
+  vacation: 'warning'
+};
+
+// Durum metinleri
+const statusTexts = {
+  active: 'Aktif',
+  inactive: 'Pasif',
+  vacation: 'İzinde'
+};
+
+// Görünüm tipleri
+type ViewType = 'grid' | 'list';
+
+// LocalStorage'dan ekip üyelerini yükle
+const loadTeamMembersFromStorage = (): TeamMember[] => {
+  try {
+    const savedMembers = localStorage.getItem('teamMembers');
+    if (savedMembers) {
+      return JSON.parse(savedMembers);
+    }
+  } catch (error) {
+    console.error('Ekip üyeleri yüklenirken hata oluştu:', error);
+  }
+  
+  // Ekip üyeleri yoksa boş dizi döndür
+  return mockTeamMembers;
+};
+
+// LocalStorage'a ekip üyelerini kaydet
+const saveTeamMembersToStorage = (members: TeamMember[]) => {
+  try {
+    localStorage.setItem('teamMembers', JSON.stringify(members));
+  } catch (error) {
+    console.error('Ekip üyeleri kaydedilirken hata oluştu:', error);
+  }
+};

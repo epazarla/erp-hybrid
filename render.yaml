@@ -2,11 +2,13 @@ services:
   - type: web
     name: erp-hybrid-api
     env: node
-    buildCommand: cd server && npm install && npm run build
-    startCommand: cd server && npm start
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm run dev
     envVars:
       - key: NODE_ENV
-        value: production
+        value: development
+      - key: PORT
+        value: 10000
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
     plan: free

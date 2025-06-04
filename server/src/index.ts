@@ -3,7 +3,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
-import { apiRouter } from './routes/api';
+import apiRouter from './routes/api';
 
 // Eski rotalar (yedek olarak tutuyoruz)
 // import { userRouter } from './routes/user';
@@ -32,12 +32,12 @@ app.use('/api', apiRouter);
 // app.use('/api/client', clientRouter);
 
 // Sağlık kontrolü endpoint'i
-app.get('/api/health', (req, res) => {
+app.get('/api/health', (req: express.Request, res: express.Response) => {
   res.json({ status: 'ok', message: 'ERP Hybrid API çalışıyor!' });
 });
 
 // Geçici: Ana endpoint
-app.get('/', (req, res) => {
+app.get('/', (req: express.Request, res: express.Response) => {
   res.send('E-Pazarla ERP Hybrid Backend API');
 });
 

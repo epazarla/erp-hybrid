@@ -1,0 +1,1394 @@
+// Bu dosya bağımsız bir TypeScript React bileşeni olarak düzenlenmiştir
+// Gerçek proje içinde kullanmak için, bu dosyayı proje klasörüne taşıyın
+// ve import ifadelerini etkinleştirin
+
+// import React, { useState, useEffect } from 'react';
+// import { 
+//   Box, 
+//   Grid, 
+//   Typography, 
+//   Card, 
+//   CardContent, 
+//   Avatar, 
+//   List, 
+//   ListItem, 
+//   ListItemAvatar, 
+//   ListItemText, 
+//   Chip,
+//   IconButton,
+//   Button,
+//   LinearProgress,
+//   useTheme
+// } from '@mui/material';
+// import { 
+//   TrendingUp as TrendingUpIcon,
+//   TrendingDown as TrendingDownIcon,
+//   MoreVert as MoreVertIcon,
+//   CheckCircle as CheckCircleIcon,
+//   Schedule as ScheduleIcon,
+//   Flag as FlagIcon,
+//   Facebook as FacebookIcon,
+//   Instagram as InstagramIcon,
+//   Twitter as TwitterIcon,
+//   YouTube as YouTubeIcon,
+//   ArrowForward as ArrowForwardIcon,
+//   Business as BusinessIcon,
+//   Done as DoneIcon
+// } from '@mui/icons-material';
+// import { 
+//   Chart as ChartJS, 
+//   CategoryScale, 
+//   LinearScale, 
+//   PointElement, 
+//   LineElement, 
+//   BarElement,
+//   Title, 
+//   Tooltip, 
+//   Legend, 
+//   ArcElement,
+//   Filler
+// } from 'chart.js';
+// import { Line, Bar, Doughnut } from 'react-chartjs-2';
+// import { format } from 'date-fns';
+// import { tr } from 'date-fns/locale';
+// import { Task, getAllTasks, TASKS_UPDATED_EVENT, TASK_STATUSES } from '../services/TaskService';
+// import { getAllUsers } from '../services/UserService';
+// import { User } from '../types/User';
+// import { Client, getAllClients, CLIENTS_UPDATED_EVENT, SECTORS } from '../services/ClientService';
+
+// Tip tanımlamaları
+type User = {
+  id: number;
+  name: string;
+  email: string;
+  status: string;
+  avatarUrl: string;
+};
+
+type Task = {
+  id: number;
+  title: string;
+  description: string;
+  status: string;
+  priority: string;
+  assigned_to: number;
+  created_at: string;
+  due_date: string;
+  category?: string;
+};
+
+type ClientType = {
+  id: string;
+  name: string;
+  sector: string;
+  isActive: boolean;
+  monthlyIncome?: number;
+  paymentStatus?: 'paid' | 'pending' | 'overdue' | 'none';
+  lastPaymentDate?: string;
+};
+
+// Sabit değerler
+const TASKS_UPDATED_EVENT = 'tasksUpdated';
+const CLIENTS_UPDATED_EVENT = 'clientsUpdated';
+const TASK_STATUSES = ['Bekliyor', 'Devam Ediyor', 'Tamamlandı', 'İptal Edildi'];
+const SECTORS = [
+  'Teknoloji',
+  'E-ticaret',
+  'Üretim',
+  'Hizmet',
+  'Sağlık',
+  'Eğitim',
+  'Gıda',
+  'İnşaat',
+  'Tekstil',
+  'Otomotiv',
+  'Finans',
+  'Diğer'
+];
+
+// Mock veri fonksiyonları
+const getAllTasks = (): Task[] => {
+  return [];
+};
+
+const getAllUsers = (): User[] => {
+  return [];
+};
+
+const getAllClients = (onlyActive?: boolean): ClientType[] => {
+  return [];
+};
+
+// Format fonksiyonu
+const format = (date: Date, formatStr: string, options?: any): string => {
+  return date.toLocaleDateString('tr-TR');
+};
+
+// Locale
+const tr = {};
+
+// React ve Material UI bileşenleri için mock tanımlamalar
+const React = { createElement: (...args: any[]) => ({}) };
+const useState = <T,>(initialState: T): [T, (newState: T) => void] => [initialState, () => {}];
+const useEffect = (effect: () => void | (() => void), deps?: any[]) => {};
+const useTheme = () => ({ 
+  palette: { 
+    mode: 'light',
+    primary: { main: '#1976d2' }, 
+    secondary: { main: '#dc004e' }, 
+    error: { main: '#f44336' }, 
+    warning: { main: '#ff9800' }, 
+    info: { main: '#2196f3' }, 
+    success: { main: '#4caf50' } 
+  } 
+});
+
+// Material UI bileşenleri için mock tanımlamalar
+const Box = (props: any) => React.createElement('div', props);
+const Grid = (props: any) => React.createElement('div', props);
+const Typography = (props: any) => React.createElement('p', props);
+const Card = (props: any) => React.createElement('div', props);
+const CardContent = (props: any) => React.createElement('div', props);
+const Avatar = (props: any) => React.createElement('div', props);
+const List = (props: any) => React.createElement('ul', props);
+const ListItem = (props: any) => React.createElement('li', props);
+const ListItemAvatar = (props: any) => React.createElement('div', props);
+const ListItemText = (props: any) => React.createElement('div', props);
+const Chip = (props: any) => React.createElement('div', props);
+const IconButton = (props: any) => React.createElement('button', props);
+const Button = (props: any) => React.createElement('button', props);
+const LinearProgress = (props: any) => React.createElement('div', props);
+
+// Material UI Icons için mock tanımlamalar
+const TrendingUpIcon = () => React.createElement('span', {}, '↑');
+const TrendingDownIcon = () => React.createElement('span', {}, '↓');
+const MoreVertIcon = () => React.createElement('span', {}, '⋮');
+const CheckCircleIcon = () => React.createElement('span', {}, '✓');
+const ScheduleIcon = () => React.createElement('span', {}, '⏱');
+const FlagIcon = () => React.createElement('span', {}, '⚑');
+const FacebookIcon = () => React.createElement('span', {}, 'f');
+const InstagramIcon = () => React.createElement('span', {}, 'i');
+const TwitterIcon = () => React.createElement('span', {}, 't');
+const YouTubeIcon = () => React.createElement('span', {}, 'y');
+const ArrowForwardIcon = () => React.createElement('span', {}, '→');
+const BusinessIcon = () => React.createElement('span', {}, '🏢');
+const DoneIcon = () => React.createElement('span', {}, '✓');
+
+// Chart.js için mock tanımlamalar
+const ChartJS = { register: (...args: any[]) => {} };
+const CategoryScale = {};
+const LinearScale = {};
+const PointElement = {};
+const LineElement = {};
+const BarElement = {};
+const Title = {};
+const Tooltip = {};
+const Legend = {};
+const ArcElement = {};
+const Filler = {};
+
+// Chart bileşenleri için mock tanımlamalar
+const Line = (props: any) => React.createElement('canvas', props);
+const Bar = (props: any) => React.createElement('canvas', props);
+const Doughnut = (props: any) => React.createElement('canvas', props);
+
+// Aktif kullanıcıları getiren fonksiyon
+const getActiveUsers = (): User[] => {
+  const allUsers = getAllUsers();
+  return allUsers.filter(user => user.status === 'active');
+};
+
+// Chart.js bileşenlerini kaydet
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+  ArcElement,
+  Filler
+);
+
+// Kullanıcı avatar URL'lerini önbellek için saklayacak nesne
+const userAvatars: Record<number, string> = {
+  1: 'https://randomuser.me/api/portraits/men/1.jpg',
+  2: 'https://randomuser.me/api/portraits/women/2.jpg',
+  3: 'https://randomuser.me/api/portraits/men/3.jpg',
+  4: 'https://randomuser.me/api/portraits/women/4.jpg',
+  5: 'https://randomuser.me/api/portraits/men/5.jpg'
+};
+
+// Proje arayüzü
+interface Project {
+  name: string;
+  progress: number;
+  client: string;
+  totalTasks: number;
+  completedTasks: number;
+}
+
+// Müşteri avatar renklerini belirlemek için kullanılacak renkler
+const avatarColors = [
+  '#1877f2', // Mavi
+  '#e1306c', // Pembe
+  '#ff9800', // Turuncu
+  '#4caf50', // Yeşil
+  '#9c27b0', // Mor
+  '#f44336', // Kırmızı
+  '#2196f3', // Açık Mavi
+  '#607d8b', // Gri Mavi
+  '#795548', // Kahverengi
+  '#00bcd4', // Turkuaz
+];
+
+export default function DashboardPage() {
+  const theme = useTheme();
+  
+  // State tanımlamaları
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [activeUsers, setActiveUsers] = useState<User[]>([]);
+  const [activeClients, setActiveClients] = useState<ClientType[]>([]);
+  const [ongoingTasks, setOngoingTasks] = useState<Task[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [completedTaskCount, setCompletedTaskCount] = useState<number>(0);
+  const [completedTasksChange, setCompletedTasksChange] = useState<number>(0);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [activeProjectCount, setActiveProjectCount] = useState<number>(0);
+  
+  // Görevleri, kullanıcıları ve müşterileri yükle
+  useEffect(() => {
+    loadTasks();
+    loadUsers();
+    loadClients();
+    
+    // Görev güncellemelerini dinle
+    const handleTasksUpdated = () => {
+      console.log('Görevler güncellendi, dashboard yeniden yükleniyor...');
+      loadTasks();
+    };
+    
+    // Müşteri güncellemelerini dinle
+    const handleClientsUpdated = () => {
+      console.log('Müşteriler güncellendi, dashboard yeniden yükleniyor...');
+      loadClients();
+    };
+    
+    window.addEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
+    window.addEventListener(CLIENTS_UPDATED_EVENT, handleClientsUpdated);
+    
+    return () => {
+      window.removeEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
+      window.removeEventListener(CLIENTS_UPDATED_EVENT, handleClientsUpdated);
+    };
+  }, []);
+  
+  // Görevleri yükle ve projeleri oluştur
+  const loadTasks = () => {
+    try {
+      const allTasks = getAllTasks();
+      setTasks(allTasks);
+      
+      // Devam eden görevleri filtrele (en fazla 3 tane)
+      const ongoing = allTasks
+        .filter(task => task.status === 'Devam Ediyor')
+        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime())
+        .slice(0, 3);
+      
+      setOngoingTasks(ongoing);
+      
+      // Tamamlanan görevleri filtrele (en fazla 3 tane, en son tamamlananlar)
+      const completed = allTasks
+        .filter(task => task.status === 'Tamamlandı')
+        .sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime()) // En son tamamlananlar önce
+        .slice(0, 3);
+      
+      setCompletedTasks(completed);
+      
+      // Görev istatistiklerini hesapla
+      const totalCompletedTasks = allTasks.filter(task => task.status === 'Tamamlandı').length;
+      setCompletedTaskCount(totalCompletedTasks);
+      
+      const lastMonthDate = new Date();
+      lastMonthDate.setMonth(lastMonthDate.getMonth() - 1);
+      
+      const lastMonthCompletedTasks = allTasks.filter(task => 
+        task.status === 'Tamamlandı' && 
+        new Date(task.due_date) < new Date() && 
+        new Date(task.due_date) > lastMonthDate
+      ).length;
+      
+      // Tamamlanan görev artış yüzdesini hesapla
+      const previousMonthDate = new Date(lastMonthDate);
+      previousMonthDate.setMonth(previousMonthDate.getMonth() - 1);
+      
+      const previousMonthCompletedTasks = allTasks.filter(task => 
+        task.status === 'Tamamlandı' && 
+        new Date(task.due_date) < lastMonthDate && 
+        new Date(task.due_date) > previousMonthDate
+      ).length;
+      
+      // Yüzde değişimi hesapla (eğer önceki ay 0 ise, %100 artış say)
+      let completedTasksChangePercent = 0;
+      if (previousMonthCompletedTasks === 0) {
+        completedTasksChangePercent = lastMonthCompletedTasks > 0 ? 100 : 0;
+      } else {
+        completedTasksChangePercent = Math.round(
+          ((lastMonthCompletedTasks - previousMonthCompletedTasks) / previousMonthCompletedTasks) * 100
+        );
+      }
+      
+      setCompletedTasksChange(completedTasksChangePercent);
+      
+      // Görevlerden proje durumlarını oluştur
+      const projectsData = generateProjectsFromTasks(allTasks);
+      setProjects(projectsData);
+      setActiveProjectCount(projectsData.length);
+      
+    } catch (error) {
+      console.error('Görevler yüklenirken hata oluştu:', error);
+    }
+  };
+  
+  // Görevlerden proje durumlarını oluştur
+  const generateProjectsFromTasks = (allTasks: Task[]): Project[] => {
+    // Önce müşteri bazında görevleri grupla
+    const tasksByClient: { [key: string]: { tasks: Task[], clientName: string } } = {};
+    
+    // Her görev için kategori bilgisini kontrol et
+    allTasks.forEach(task => {
+      if (task.category) {
+        // Kategori adını müşteri ID'si olarak kullan (basitleştirme)
+        // Gerçek uygulamada, görevlerin müşteri ID'leri olmalıdır
+        const clientId = task.category;
+        
+        if (!tasksByClient[clientId]) {
+          // Müşteri adını bulmak için aktif müşterileri kontrol et
+          const client = activeClients.find(c => c.name === clientId || c.id === clientId);
+          
+          tasksByClient[clientId] = {
+            tasks: [],
+            clientName: client ? client.name : clientId // Eğer müşteri bulunursa adını kullan, yoksa kategori adını
+          };
+        }
+        
+        tasksByClient[clientId].tasks.push(task);
+      }
+    });
+    
+    // Müşteri gruplarını proje verilerine dönüştür
+    const projectsData: Project[] = [];
+    
+    Object.keys(tasksByClient).forEach(clientId => {
+      const clientData = tasksByClient[clientId];
+      const clientTasks = clientData.tasks;
+      const totalTasks = clientTasks.length;
+      const completedTasks = clientTasks.filter(t => t.status === 'Tamamlandı').length;
+      const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+      
+      projectsData.push({
+        name: clientData.clientName,
+        progress,
+        client: clientData.clientName,
+        totalTasks,
+        completedTasks
+      });
+    });
+    
+    // İlerleme durumuna göre sırala (en yüksek ilerleme en üstte)
+    return projectsData.sort((a, b) => b.progress - a.progress);
+  };
+  
+  // Kullanıcıları yükle
+  const loadUsers = (): void => {
+    try {
+      const users = getActiveUsers();
+      setActiveUsers(users);
+    } catch (error) {
+      console.error('Kullanıcılar yüklenirken hata oluştu:', error);
+    }
+  };
+  
+  // Müşterileri yükle
+  const loadClients = () => {
+    try {
+      const clients = getAllClients(true); // Sadece aktif müşterileri al
+      setActiveClients(clients);
+    } catch (error) {
+      console.error('Müşteriler yüklenirken hata oluştu:', error);
+    }
+  };
+  
+  // Toplam aylık geliri hesapla
+  const calculateTotalMonthlyIncome = (): number => {
+    return activeClients.reduce((total, client) => {
+      return total + (client.monthlyIncome || 0);
+    }, 0);
+  };
+  
+  // Gelir değişimini hesapla (pozitif veya negatif)
+  const calculateIncomeChange = (): number => {
+    // Toplam aylık geliri hesapla
+    const totalMonthlyIncome = calculateTotalMonthlyIncome();
+    
+    // Ödeme durumlarına göre müşterileri say
+    const paidClientsCount = activeClients.filter(c => c.paymentStatus === 'paid').length;
+    const pendingClientsCount = activeClients.filter(c => c.paymentStatus === 'pending').length;
+    const overdueClientsCount = activeClients.filter(c => c.paymentStatus === 'overdue').length;
+    
+    // Ödeme durumlarına göre ağırlıklı bir değişim hesapla
+    // Ödenmiş müşteriler pozitif etki, gecikmiş müşteriler negatif etki yapar
+    const totalClients = paidClientsCount + pendingClientsCount + overdueClientsCount;
+    
+    if (totalClients === 0) return 0;
+    
+    // Ödeme durumlarına göre ağırlıklı bir değişim hesapla
+    const changeRate = ((paidClientsCount * 0.1) - (overdueClientsCount * 0.15)) / totalClients;
+    
+    return changeRate;
+  };
+  
+  // Gelir değişim yüzdesini hesapla
+  const calculateIncomeChangePercentage = (): number => {
+    const change = calculateIncomeChange();
+    // Yüzdeye çevir ve en yakın tam sayıya yuvarla
+    return Math.round(change * 100);
+  };
+  
+  // Ödenen yüzdeyi hesapla
+  const calculatePaidPercentage = (): number => {
+    // Sadece aylık geliri olan aktif müşterileri hesaba kat
+    const clientsWithIncome = activeClients.filter(client => client.monthlyIncome && client.monthlyIncome > 0);
+    const totalIncome = clientsWithIncome.reduce((sum, client) => sum + (client.monthlyIncome || 0), 0);
+    
+    if (totalIncome === 0) return 0;
+    
+    // Ödenmiş durumundaki müşterilerin toplam geliri
+    const paidIncome = clientsWithIncome
+      .filter(client => client.paymentStatus === 'paid')
+      .reduce((sum, client) => sum + (client.monthlyIncome || 0), 0);
+    
+    // Ödenen gelirin toplam gelire oranı
+    return Math.round((paidIncome / totalIncome) * 100);
+  };
+  
+  // Bekleyen ödemelerin yüzdesini hesapla
+  const calculatePendingPercentage = (): number => {
+    // Sadece aylık geliri olan aktif müşterileri hesaba kat
+    const clientsWithIncome = activeClients.filter(client => client.monthlyIncome && client.monthlyIncome > 0);
+    const totalIncome = clientsWithIncome.reduce((sum, client) => sum + (client.monthlyIncome || 0), 0);
+    
+    if (totalIncome === 0) return 0;
+    
+    // Bekleyen durumundaki müşterilerin toplam geliri
+    const pendingIncome = clientsWithIncome
+      .filter(client => client.paymentStatus === 'pending')
+      .reduce((sum, client) => sum + (client.monthlyIncome || 0), 0);
+    
+    // Geciken durumundaki müşterilerin toplam geliri
+    const overdueIncome = clientsWithIncome
+      .filter(client => client.paymentStatus === 'overdue')
+      .reduce((sum, client) => sum + (client.monthlyIncome || 0), 0);
+    
+    // Bekleyen ve geciken ödemelerin toplam gelire oranı
+    return Math.round(((pendingIncome + overdueIncome) / totalIncome) * 100);
+  };
+  
+  // Kullanıcı adını ve avatarını getir
+  const getUserInfo = (userId: number) => {
+    const user = activeUsers.find(u => u.id === userId);
+    return {
+      name: user ? user.name : 'Bilinmeyen Kullanıcı',
+      avatar: user?.avatarUrl || userAvatars[userId] || `https://randomuser.me/api/portraits/${userId % 2 === 0 ? 'women' : 'men'}/${userId % 10}.jpg`
+    };
+  };
+  
+  // Görev durumunu metin olarak döndür
+  const getTaskStatusText = (status: string) => {
+    switch (status) {
+      case 'Bekliyor': return 'Yeni';
+      case 'Devam Ediyor': return 'Devam Ediyor';
+      case 'Tamamlandı': return 'Tamamlandı';
+      case 'İptal Edildi': return 'İptal';
+      default: return status;
+    }
+  };
+  
+  // Görev durumuna göre renk belirle
+  const getStatusColor = (status: string): 'primary' | 'warning' | 'success' | 'error' | 'default' => {
+    switch (status) {
+      case 'Bekliyor': return 'primary';
+      case 'Devam Ediyor': return 'warning';
+      case 'Tamamlandı': return 'success';
+      case 'İptal Edildi': return 'error';
+      default: return 'default';
+    }
+  };
+  
+  // Son 6 ayın isimlerini oluştur
+  const getLastSixMonths = () => {
+    const months: string[] = [];
+    const now = new Date();
+    
+    for (let i = 5; i >= 0; i--) {
+      const month = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      // format fonksiyonunu kullanarak ay isimlerini oluştur
+      months.push(format(month, 'MMM', { locale: tr }));
+    }
+    
+    return months;
+  };
+  
+  // Aylara göre görev sayılarını hesapla
+  const getTaskCountsByMonth = () => {
+    const months = getLastSixMonths();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Her ay için görev durumlarını saklamak için başlangıç verileri
+    const completedTasks = Array(6).fill(0);
+    const ongoingTasks = Array(6).fill(0);
+    const pendingTasks = Array(6).fill(0);
+    const cancelledTasks = Array(6).fill(0);
+    
+    // Tüm görevleri döngüye al ve aylara göre dağıt
+    tasks.forEach(task => {
+      // Bitiş tarihini kullan (daha anlamlı bir gösterge)
+      // Eğer bitiş tarihi yoksa, oluşturulma tarihini kullan
+      const taskDate = new Date(task.due_date || task.created_at);
+      const taskMonth = taskDate.getMonth();
+      const taskYear = taskDate.getFullYear();
+      
+      // Son 6 ay içindeki görevleri bul
+      for (let i = 0; i < 6; i++) {
+        const targetMonth = (currentMonth - i + 12) % 12; // Negatif ay indekslerini düzelt
+        const targetYear = currentYear - (currentMonth < i ? 1 : 0); // Yıl geçişlerini düzelt
+        
+        if (taskMonth === targetMonth && taskYear === targetYear) {
+          // Görev durumuna göre ilgili aya ekle
+          switch (task.status) {
+            case 'Tamamlandı':
+              completedTasks[5 - i]++;
+              break;
+            case 'Devam Ediyor':
+              ongoingTasks[5 - i]++;
+              break;
+            case 'Bekliyor':
+              pendingTasks[5 - i]++;
+              break;
+            case 'İptal Edildi':
+              cancelledTasks[5 - i]++;
+              break;
+          }
+          break;
+        }
+      }
+    });
+    
+    // Mevcut ay için görev sayılarını doğru şekilde göstermek için ek kontrol
+    // Eğer mevcut ay için hiç görev yoksa ve diğer aylarda görev varsa
+    // Muhtemelen görevler geçmiş aylara ait, ancak hala aktif
+    if (completedTasks[5] === 0 && ongoingTasks[5] === 0 && pendingTasks[5] === 0) {
+      // Devam eden ve bekleyen görevleri say
+      const activeTaskCount = tasks.filter(t => 
+        t.status === 'Devam Ediyor' || t.status === 'Bekliyor'
+      ).length;
+      
+      // Aktif görevleri mevcut aya ekle
+      if (activeTaskCount > 0) {
+        // Devam eden ve bekleyen görevleri yaklaşık olarak böl
+        ongoingTasks[5] = Math.ceil(activeTaskCount * 0.6); // %60'ı devam ediyor
+        pendingTasks[5] = activeTaskCount - ongoingTasks[5]; // Kalanı bekliyor
+      }
+    }
+    
+    return {
+      months,
+      completedTasks,
+      ongoingTasks,
+      pendingTasks,
+      cancelledTasks
+    };
+  };
+  
+  // Müşterilerin sektörlere göre dağılımını hesapla
+  const calculateClientSectorDistribution = () => {
+    const sectorCounts: Record<string, number> = {};
+    
+    // Sadece aktif müşterileri hesaba kat
+    const clients = activeClients.filter(client => client.isActive);
+    
+    // Müşterileri sektörlere göre say
+    clients.forEach(client => {
+      if (client.sector) {
+        // Eğer sektör zaten kayıtlıysa, sayısını artır
+        if (sectorCounts[client.sector]) {
+          sectorCounts[client.sector]++;
+        } else {
+          // Yeni sektör ekliyoruz
+          sectorCounts[client.sector] = 1;
+        }
+      } else {
+        // Sektörü olmayan müşteriler için 'Diğer' kategorisini kullan
+        if (sectorCounts['Diğer']) {
+          sectorCounts['Diğer']++;
+        } else {
+          sectorCounts['Diğer'] = 1;
+        }
+      }
+    });
+    
+    // Sektörleri müşteri sayısına göre sırala (en yüksekten en düşüğe)
+    const sortedSectors = Object.keys(sectorCounts).sort((a, b) => sectorCounts[b] - sectorCounts[a]);
+    const sortedCounts = sortedSectors.map(sector => sectorCounts[sector]);
+    
+    return {
+      sectors: sortedSectors,
+      counts: sortedCounts
+    };
+  };
+  
+  // Gelir verilerini hesapla - müşteri ödemelerine göre
+  const calculateRevenueData = () => {
+    const months = getLastSixMonths();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    
+    // Her ay için gelir verilerini saklamak için başlangıç dizileri
+    const paidRevenue = Array(6).fill(0);
+    const pendingRevenue = Array(6).fill(0);
+    const overdueRevenue = Array(6).fill(0);
+    
+    // Tüm aktif müşterileri döngüye al
+    activeClients.forEach(client => {
+      // Müşterinin aylık geliri yoksa hesaplama yapma
+      if (!client.monthlyIncome) return;
+      
+      // Mevcut ay için ödeme durumuna göre geliri ekle
+      if (client.paymentStatus === 'paid') {
+        paidRevenue[5] += client.monthlyIncome;
+      } else if (client.paymentStatus === 'pending') {
+        pendingRevenue[5] += client.monthlyIncome;
+      } else if (client.paymentStatus === 'overdue') {
+        overdueRevenue[5] += client.monthlyIncome;
+      }
+      
+      // Son ödeme tarihini kontrol et
+      if (client.lastPaymentDate) {
+        const lastPaymentDate = new Date(client.lastPaymentDate);
+        const paymentMonth = lastPaymentDate.getMonth();
+        const paymentYear = lastPaymentDate.getFullYear();
+        
+        // Son 6 ay içindeki ödemeleri bul
+        for (let i = 1; i < 6; i++) { // i=1'den başla çünkü mevcut ay için zaten yukarıda ekledik
+          const targetMonth = (currentMonth - i + 12) % 12; // Negatif ay indekslerini düzelt
+          const targetYear = currentYear - (currentMonth < i ? 1 : 0); // Yıl geçişlerini düzelt
+          
+          // Ödeme bu ay içinde mi kontrol et
+          const isPaymentInThisMonth = (paymentMonth === targetMonth && paymentYear === targetYear);
+          
+          if (isPaymentInThisMonth) {
+            // Bu ayda ödeme yapılmışsa, ödendi olarak işaretle
+            paidRevenue[5 - i] += client.monthlyIncome;
+          } else {
+            // Önceki aylarda ödeme durumunu müşterinin mevcut durumuna göre belirle
+            // Bu daha gerçekçi bir yaklaşım olacaktır
+            if (client.paymentStatus === 'paid' || client.paymentStatus === 'pending') {
+              // Düzenli ödeme yapan müşteriler için geçmiş ayları da ödenmiş varsay
+              paidRevenue[5 - i] += client.monthlyIncome;
+            } else if (client.paymentStatus === 'overdue') {
+              // Ödemesi geciken müşteriler için geçmiş ayları da gecikmiş varsay
+              // Ancak son ödeme tarihinden önceki aylar için ödendi varsay
+              const monthsSinceLastPayment = (currentMonth - paymentMonth + 12) % 12;
+              if (i > monthsSinceLastPayment) {
+                paidRevenue[5 - i] += client.monthlyIncome;
+              } else {
+                overdueRevenue[5 - i] += client.monthlyIncome;
+              }
+            }
+          }
+        }
+      } else {
+        // Son ödeme tarihi yoksa, müşterinin mevcut durumuna göre geçmiş ayları tahmin et
+        for (let i = 1; i < 6; i++) {
+          if (client.paymentStatus === 'paid') {
+            // Düzenli ödeme yapan müşteriler için geçmiş ayları da ödenmiş varsay
+            paidRevenue[5 - i] += client.monthlyIncome;
+          } else if (client.paymentStatus === 'pending') {
+            // Bekleyen ödemesi olan müşteriler için son 2 ayı beklemede, öncesini ödenmiş varsay
+            if (i <= 2) {
+              pendingRevenue[5 - i] += client.monthlyIncome;
+            } else {
+              paidRevenue[5 - i] += client.monthlyIncome;
+            }
+          } else if (client.paymentStatus === 'overdue') {
+            // Gecikmiş ödemesi olan müşteriler için son 3 ayı gecikmiş, öncesini ödenmiş varsay
+            if (i <= 3) {
+              overdueRevenue[5 - i] += client.monthlyIncome;
+            } else {
+              paidRevenue[5 - i] += client.monthlyIncome;
+            }
+          }
+        }
+      }
+    });
+    
+    return {
+      months,
+      paidRevenue,
+      pendingRevenue,
+      overdueRevenue
+    };
+  };
+  
+  // Görev tamamlama verileri
+  const taskData = getTaskCountsByMonth();
+  const taskCompletionData = {
+    labels: taskData.months,
+    datasets: [
+      {
+        label: 'Tamamlanan',
+        data: taskData.completedTasks,
+        backgroundColor: theme.palette.success.main,
+      },
+      {
+        label: 'Devam Eden',
+        data: taskData.ongoingTasks,
+        backgroundColor: theme.palette.warning.main,
+      },
+      {
+        label: 'Bekleyen',
+        data: taskData.pendingTasks,
+        backgroundColor: theme.palette.primary.main,
+      },
+    ],
+  };
+  
+  // Müşteri dağılım verileri
+  const clientDistribution = calculateClientSectorDistribution();
+  const clientDistributionData = {
+    labels: clientDistribution.sectors,
+    datasets: [
+      {
+        data: clientDistribution.counts,
+        backgroundColor: [
+          '#1877f2', // Mavi
+          '#e1306c', // Pembe
+          '#ff9800', // Turuncu
+          '#4caf50', // Yeşil
+          '#9c27b0', // Mor
+          '#f44336', // Kırmızı
+          '#2196f3', // Açık Mavi
+          '#607d8b', // Gri Mavi
+          '#795548', // Kahverengi
+          '#00bcd4', // Turkuaz
+        ],
+        borderWidth: 0,
+      },
+    ],
+  };
+  
+  // Gelir analiz verileri
+  const revenueDataCalc = calculateRevenueData();
+  const revenueData = {
+    labels: revenueDataCalc.months,
+    datasets: [
+      {
+        label: 'Tahsil Edilen',
+        data: revenueDataCalc.paidRevenue,
+        borderColor: theme.palette.success.main,
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        fill: true,
+        tension: 0.4,
+      },
+      {
+        label: 'Bekleyen',
+        data: revenueDataCalc.pendingRevenue,
+        borderColor: theme.palette.warning.main,
+        backgroundColor: 'rgba(255, 152, 0, 0.1)',
+        fill: true,
+        tension: 0.4,
+      },
+      {
+        label: 'Gecikmiş',
+        data: revenueDataCalc.overdueRevenue,
+        borderColor: theme.palette.error.main,
+        backgroundColor: 'rgba(244, 67, 54, 0.1)',
+        fill: true,
+        tension: 0.4,
+      },
+    ],
+  };
+  
+  // Sektör dağılımı verilerini hesapla
+  const sectorDistribution = calculateClientSectorDistribution();
+  
+  // Sektör dağılımı grafik verileri
+  const sectorData = {
+    labels: sectorDistribution.sectors,
+    datasets: [
+      {
+        data: sectorDistribution.counts,
+        backgroundColor: sectorDistribution.sectors.map((_, index) => 
+          avatarColors[index % avatarColors.length]
+        ),
+        borderWidth: 0,
+      },
+    ],
+  };
+  
+  return (
+    <Box sx={{ p: 3 }}>
+      <Grid container spacing={3}>
+        {/* Üst Sıra Widget'ları */}
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Aylık Gelir
+                </Typography>
+                <Avatar sx={{ bgcolor: theme.palette.primary.main }}>
+                  <TrendingUpIcon />
+                </Avatar>
+              </Box>
+              <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                ₺{calculateTotalMonthlyIncome().toLocaleString()}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                {calculateIncomeChangePercentage() >= 0 ? (
+                  <Chip 
+                    icon={<TrendingUpIcon fontSize="small" />} 
+                    label={`+${calculateIncomeChangePercentage()}%`} 
+                    size="small" 
+                    color="success" 
+                    sx={{ height: 24, fontSize: '0.7rem' }}
+                  />
+                ) : (
+                  <Chip 
+                    icon={<TrendingDownIcon fontSize="small" />} 
+                    label={`${calculateIncomeChangePercentage()}%`} 
+                    size="small" 
+                    color="error" 
+                    sx={{ height: 24, fontSize: '0.7rem' }}
+                  />
+                )}
+                <Typography variant="body2" color="text.secondary" sx={{ ml: 1 }}>
+                  geçen aya göre
+                </Typography>
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <LinearProgress 
+                  variant="determinate" 
+                  value={calculatePaidPercentage()} 
+                  color="success"
+                  sx={{ height: 8, borderRadius: 4, mb: 1 }}
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Ödenen: %{calculatePaidPercentage()} | Bekleyen: %{calculatePendingPercentage()}
+                </Typography>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Aktif Müşteriler
+                </Typography>
+                <Avatar sx={{ bgcolor: theme.palette.success.main }}>
+                  <BusinessIcon />
+                </Avatar>
+              </Box>
+              <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                {activeClients.length}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Chip 
+                  label="Tüm Müşteriler" 
+                  size="small" 
+                  color="primary" 
+                  sx={{ height: 24, fontSize: '0.7rem' }}
+                />
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <List sx={{ p: 0 }}>
+                  {activeClients.slice(0, 3).map((client, index) => (
+                    <ListItem key={client.id} sx={{ px: 0, py: 0.5 }}>
+                      <ListItemAvatar sx={{ minWidth: 40 }}>
+                        <Avatar 
+                          sx={{ 
+                            width: 32, 
+                            height: 32, 
+                            bgcolor: avatarColors[index % avatarColors.length],
+                            fontSize: '0.9rem'
+                          }}
+                        >
+                          {client.name.charAt(0)}
+                        </Avatar>
+                      </ListItemAvatar>
+                      <ListItemText 
+                        primary={client.name} 
+                        secondary={client.sector || 'Genel'}
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Aktif Projeler
+                </Typography>
+                <Avatar sx={{ bgcolor: theme.palette.warning.main }}>
+                  <FlagIcon />
+                </Avatar>
+              </Box>
+              <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                {activeProjectCount}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Chip 
+                  label="Devam Eden" 
+                  size="small" 
+                  color="warning" 
+                  sx={{ height: 24, fontSize: '0.7rem', mr: 1 }}
+                />
+                <Chip 
+                  label="Tamamlanan" 
+                  size="small" 
+                  color="success" 
+                  sx={{ height: 24, fontSize: '0.7rem' }}
+                />
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <List sx={{ p: 0 }}>
+                  {projects.slice(0, 3).map((project, index) => (
+                    <ListItem key={index} sx={{ px: 0, py: 0.5 }}>
+                      <ListItemText 
+                        primary={project.name} 
+                        secondary={`${project.completedTasks}/${project.totalTasks} görev`}
+                        primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
+                        secondaryTypographyProps={{ variant: 'caption' }}
+                      />
+                      <LinearProgress 
+                        variant="determinate" 
+                        value={project.progress} 
+                        color={project.progress === 100 ? 'success' : 'primary'}
+                        sx={{ width: 60, height: 6, borderRadius: 3 }}
+                      />
+                    </ListItem>
+                  ))}
+                </List>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Tamamlanan Görevler
+                </Typography>
+                <Avatar sx={{ bgcolor: theme.palette.success.main }}>
+                  <CheckCircleIcon />
+                </Avatar>
+              </Box>
+              <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                {completedTaskCount}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                {completedTasksChange > 0 ? (
+                  <>
+                    <TrendingUpIcon sx={{ color: 'success.main', mr: 1, fontSize: 20 }} />
+                    <Typography variant="body2" color="success.main" fontWeight="medium">
+                      %{Math.abs(completedTasksChange)} artış
+                    </Typography>
+                  </>
+                ) : completedTasksChange < 0 ? (
+                  <>
+                    <TrendingDownIcon sx={{ color: 'error.main', mr: 1, fontSize: 20 }} />
+                    <Typography variant="body2" color="error.main" fontWeight="medium">
+                      %{Math.abs(completedTasksChange)} azalış
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography variant="body2" color="text.secondary" fontWeight="medium">
+                    Değişim yok
+                  </Typography>
+                )}
+                <Chip 
+                  label="Son 30 gün" 
+                  size="small" 
+                  color="success" 
+                  sx={{ height: 24, fontSize: '0.7rem', ml: 1 }}
+                />
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <List sx={{ p: 0 }}>
+                  {completedTasks.map((task, index) => {
+                    const userInfo = getUserInfo(task.assigned_to);
+                    return (
+                      <ListItem key={task.id} sx={{ px: 0, py: 0.5 }}>
+                        <ListItemAvatar sx={{ minWidth: 40 }}>
+                          <Avatar 
+                            src={userInfo.avatar}
+                            sx={{ width: 32, height: 32 }}
+                          />
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary={task.title} 
+                          secondary={format(new Date(task.due_date), 'dd MMM yyyy', { locale: tr })}
+                          primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label={getTaskStatusText(task.status)} 
+                          size="small" 
+                          color={getStatusColor(task.status) as any}
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={6} lg={3}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Devam Eden Görevler
+                </Typography>
+                <Avatar sx={{ bgcolor: theme.palette.info.main }}>
+                  <ScheduleIcon />
+                </Avatar>
+              </Box>
+              <Typography variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                {ongoingTasks.length}
+              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                <Chip 
+                  label="Yakın Tarihli" 
+                  size="small" 
+                  color="info" 
+                  sx={{ height: 24, fontSize: '0.7rem' }}
+                />
+              </Box>
+              <Box sx={{ mt: 2 }}>
+                <List sx={{ p: 0 }}>
+                  {ongoingTasks.map((task, index) => {
+                    const userInfo = getUserInfo(task.assigned_to);
+                    return (
+                      <ListItem key={task.id} sx={{ px: 0, py: 0.5 }}>
+                        <ListItemAvatar sx={{ minWidth: 40 }}>
+                          <Avatar 
+                            src={userInfo.avatar}
+                            sx={{ width: 32, height: 32 }}
+                          />
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary={task.title} 
+                          secondary={format(new Date(task.due_date), 'dd MMM yyyy', { locale: tr })}
+                          primaryTypographyProps={{ variant: 'body2', fontWeight: 'medium' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label={getTaskStatusText(task.status)} 
+                          size="small" 
+                          color={getStatusColor(task.status) as any}
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                    );
+                  })}
+                </List>
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Grafik Satırı */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Görev Tamamlama Analizi
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Son 6 ay içindeki görev durumlarının analizi
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <Bar 
+                  data={taskCompletionData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        align: 'end',
+                      },
+                    },
+                    scales: {
+                      x: {
+                        grid: {
+                          display: false,
+                        },
+                      },
+                      y: {
+                        beginAtZero: true,
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Müşteri Sektör Dağılımı
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Aktif müşterilerin sektörlere göre dağılımı
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Box sx={{ height: 300, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                <Doughnut 
+                  data={clientDistributionData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'bottom',
+                      },
+                    },
+                  }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        {/* Alt Satır */}
+        <Grid item xs={12} md={8}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" sx={{ mb: 2 }}>
+                  Gelir Analizi
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Son 6 ay içindeki ödeme durumlarına göre gelir analizi
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Box sx={{ height: 300 }}>
+                <Line 
+                  data={revenueData} 
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        position: 'top',
+                        align: 'end',
+                      },
+                    },
+                    scales: {
+                      x: {
+                        grid: {
+                          display: false,
+                        },
+                      },
+                      y: {
+                        beginAtZero: true,
+                      }
+                    }
+                  }}
+                />
+              </Box>
+            </CardContent>
+          </Card>
+        </Grid>
+        
+        <Grid item xs={12} md={4}>
+          <Card sx={{
+            boxShadow: theme.palette.mode === 'dark' 
+              ? '0 8px 16px 0 rgba(0,0,0,0.2)' 
+              : '0 8px 16px 0 rgba(0,0,0,0.1)',
+            height: '100%'
+          }}>
+            <CardContent sx={{ p: 3 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                <Typography variant="h6" fontWeight="bold">
+                  Sosyal Medya
+                </Typography>
+                <IconButton size="small">
+                  <MoreVertIcon />
+                </IconButton>
+              </Box>
+              <Grid container spacing={3}>
+                <Grid item xs={12} sm={6}>
+                  <Doughnut 
+                    data={sectorData} 
+                    options={{
+                      responsive: true,
+                      maintainAspectRatio: false,
+                      plugins: {
+                        legend: {
+                          display: false,
+                        },
+                      },
+                      scales: {
+                        x: {
+                          beginAtZero: true,
+                        }
+                      }
+                    }}
+                    height={150}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <List sx={{ p: 0 }}>
+                    {/* Müşteri sektör dağılımını göster */}
+                    {sectorDistribution.sectors.slice(0, 4).map((sector, index) => {
+                      const count = sectorDistribution.counts[index];
+                      const color = avatarColors[index % avatarColors.length];
+                      
+                      // Sektörün toplam müşteri sayısına oranı
+                      const totalClients = sectorDistribution.counts.reduce((sum, c) => sum + c, 0);
+                      const percentage = totalClients > 0 ? Math.round((count / totalClients) * 100) : 0;
+                      
+                      return (
+                        <ListItem key={sector} sx={{ px: 0 }}>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: color }}>
+                              {sector.charAt(0)}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText 
+                            primary={sector} 
+                            secondary={`${count} müşteri`} 
+                            primaryTypographyProps={{ variant: 'subtitle2' }}
+                            secondaryTypographyProps={{ variant: 'caption' }}
+                          />
+                          <Chip 
+                            label={`${percentage}%`} 
+                            size="small" 
+                            color={percentage > 20 ? "success" : "primary"} 
+                            sx={{ height: 24, fontSize: '0.7rem' }}
+                          />
+                        </ListItem>
+                      );
+                    })}
+                    
+                    {/* Eğer 4'ten az sektör varsa boş listeler ekle */}
+                    {Array.from({ length: Math.max(0, 4 - sectorDistribution.sectors.length) }).map((_, i) => (
+                      <ListItem key={`empty-${i}`} sx={{ px: 0, opacity: 0.5 }}>
+                        <ListItemAvatar>
+                          <Avatar sx={{ bgcolor: 'grey.300' }}>
+                            <BusinessIcon />
+                          </Avatar>
+                        </ListItemAvatar>
+                        <ListItemText 
+                          primary="Veri yok" 
+                          secondary="0 müşteri" 
+                          primaryTypographyProps={{ variant: 'subtitle2' }}
+                          secondaryTypographyProps={{ variant: 'caption' }}
+                        />
+                        <Chip 
+                          label="0%" 
+                          size="small" 
+                          color="default" 
+                          sx={{ height: 24, fontSize: '0.7rem' }}
+                        />
+                      </ListItem>
+                    ))}
+                  </List>
+                </Grid>
+              </Grid>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+    </Box>
+  );
+}

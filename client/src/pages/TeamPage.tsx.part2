@@ -1,0 +1,388 @@
+export default function TeamPage() {
+  // Temel state tanımlamaları
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>(loadTeamMembersFromStorage());
+  const [filteredMembers, setFilteredMembers] = useState<TeamMember[]>(loadTeamMembersFromStorage());
+  const [currentUser, setCurrentUserState] = useState<TeamMember | null>(null);
+  const [pendingApprovalUsers, setPendingApprovalUsers] = useState<any[]>([]);
+  
+  // UI state tanımlamaları
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedDepartment, setSelectedDepartment] = useState<string>('Tümü');
+  const [viewType, setViewType] = useState<ViewType>('grid');
+  
+  // Kullanıcı işlemleri için state tanımlamaları
+  const [switchUserSnackbar, setSwitchUserSnackbar] = useState<{open: boolean, message: string}>({open: false, message: ''});
+  
+  // Form state tanımlamaları
+  const [isAddMemberOpen, setIsAddMemberOpen] = useState<boolean>(false);
+  const [isEditMode, setIsEditMode] = useState<boolean>(false);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [newMember, setNewMember] = useState<TeamMember>({
+    id: 0,
+    name: '',
+    role: '',
+    email: '',
+    phone: '',
+    department: '',
+    status: 'active',
+    tasks: 0,
+    completedTasks: 0
+  });
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  
+  // Silme işlemleri için state tanımlamaları
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<boolean>(false);
+  const [memberToDelete, setMemberToDelete] = useState<TeamMember | null>(null);
+  const [deletedMember, setDeletedMember] = useState<TeamMember | null>(null);
+  const [snackbarOpen, setSnackbarOpen] = useState<boolean>(false);
+  const [snackbarMessage, setSnackbarMessage] = useState<string>('');
+  
+  // Ekip üyelerini UserService ile senkronize et ve mevcut kullanıcıyı yükle
+  useEffect(() => {
+    // Ekip üyelerini UserService'e gönder
+    if (teamMembers.length > 0) {
+      syncTeamMembers(teamMembers);
+      console.log('Ekip üyeleri UserService ile senkronize edildi', teamMembers);
+      
+      // Mevcut kullanıcıyı yükle
+      const user = getCurrentUser();
+      if (user) {
+        const currentTeamMember = teamMembers.find(m => m.id === user.id);
+        if (currentTeamMember) {
+          setCurrentUserState(currentTeamMember);
+        }
+      }
+    }
+    
+    // Onay bekleyen kullanıcıları yükle
+    loadPendingApprovalUsers();
+    
+    // Kullanıcı güncellemelerini dinle
+    window.addEventListener(USERS_UPDATED_EVENT, handleUsersUpdated);
+    window.addEventListener(USER_SWITCHED_EVENT, handleUserSwitched);
+    window.addEventListener(USER_APPROVAL_REQUESTED_EVENT, handleUserApprovalRequested);
+    
+    return () => {
+      window.removeEventListener(USERS_UPDATED_EVENT, handleUsersUpdated);
+      window.removeEventListener(USER_SWITCHED_EVENT, handleUserSwitched);
+      window.removeEventListener(USER_APPROVAL_REQUESTED_EVENT, handleUserApprovalRequested);
+    };
+  }, []);
+  
+  // Kullanıcı güncellemelerini dinle
+  const handleUsersUpdated = () => {
+    // Ekip üyelerini yeniden yükle
+    setTeamMembers(loadTeamMembersFromStorage());
+    
+    // Filtreleri uygula
+    applyFilters(searchQuery, selectedDepartment);
+    
+    // Onay bekleyen kullanıcıları yeniden yükle
+    loadPendingApprovalUsers();
+  };
+  
+  // Kullanıcı değişikliklerini dinle
+  const handleUserSwitched = (event: Event) => {
+    const customEvent = event as CustomEvent;
+    const user = customEvent.detail?.user;
+    
+    if (user) {
+      const teamMember = teamMembers.find(m => m.id === user.id);
+      if (teamMember) {
+        setCurrentUserState(teamMember);
+        
+        // Bildirim göster
+        setSwitchUserSnackbar({
+          open: true,
+          message: `Aktif kullanıcı ${teamMember.name} olarak değiştirildi`
+        });
+      }
+    }
+  };
+  
+  // Onay bekleyen kullanıcı olduğunda bildirim
+  const handleUserApprovalRequested = () => {
+    loadPendingApprovalUsers();
+    
+    notificationService.showNotification(
+      'Yeni bir kullanıcı onay bekliyor',
+      NotificationType.INFO
+    );
+  };
+  
+  // Onay bekleyen kullanıcıları yükle
+  const loadPendingApprovalUsers = () => {
+    const pendingUsers = getPendingApprovalUsers();
+    setPendingApprovalUsers(pendingUsers);
+  };
+  
+  // Kullanıcı değiştirme fonksiyonu
+  const handleSwitchUser = (member: TeamMember) => {
+    if (member.status !== 'active') {
+      notificationService.showNotification(
+        'Sadece aktif kullanıcılar seçilebilir',
+        NotificationType.WARNING
+      );
+      return;
+    }
+    
+    setCurrentUser(member);
+    setCurrentUserState(member);
+  };
+  
+  // Kullanıcıyı onayla
+  const handleApproveUser = (userId: number) => {
+    if (!currentUser) {
+      notificationService.showNotification(
+        'Kullanıcı onaylamak için giriş yapmalısınız',
+        NotificationType.WARNING
+      );
+      return;
+    }
+    
+    const success = approveUser(userId, currentUser.id);
+    
+    if (success) {
+      notificationService.showNotification(
+        'Kullanıcı başarıyla onaylandı',
+        NotificationType.SUCCESS
+      );
+      
+      // Onay bekleyen kullanıcıları yeniden yükle
+      loadPendingApprovalUsers();
+    } else {
+      notificationService.showNotification(
+        'Kullanıcı onaylanırken bir hata oluştu',
+        NotificationType.ERROR
+      );
+    }
+  };
+  
+  // Kullanıcı onayını reddet
+  const handleRejectUser = (userId: number) => {
+    if (!currentUser) {
+      notificationService.showNotification(
+        'Kullanıcı reddetmek için giriş yapmalısınız',
+        NotificationType.WARNING
+      );
+      return;
+    }
+    
+    const success = rejectUser(userId, currentUser.id);
+    
+    if (success) {
+      notificationService.showNotification(
+        'Kullanıcı reddedildi',
+        NotificationType.SUCCESS
+      );
+      
+      // Onay bekleyen kullanıcıları yeniden yükle
+      loadPendingApprovalUsers();
+    } else {
+      notificationService.showNotification(
+        'Kullanıcı reddedilirken bir hata oluştu',
+        NotificationType.ERROR
+      );
+    }
+  };
+  
+  // Arama ve filtreleme
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    applyFilters(query, selectedDepartment);
+  };
+  
+  // Departman filtresi
+  const handleDepartmentChange = (department: string) => {
+    setSelectedDepartment(department);
+    applyFilters(searchQuery, department);
+  };
+  
+  // Filtreleri uygula
+  const applyFilters = (query: string, department: string) => {
+    let filtered = [...teamMembers];
+    
+    // Arama filtresi
+    if (query) {
+      const lowerQuery = query.toLowerCase();
+      filtered = filtered.filter(member => 
+        member.name.toLowerCase().includes(lowerQuery) ||
+        member.email.toLowerCase().includes(lowerQuery) ||
+        member.role.toLowerCase().includes(lowerQuery) ||
+        member.department.toLowerCase().includes(lowerQuery)
+      );
+    }
+    
+    // Departman filtresi
+    if (department !== 'Tümü') {
+      filtered = filtered.filter(member => member.department === department);
+    }
+    
+    setFilteredMembers(filtered);
+  };
+  
+  // Üye ekleme modalını aç
+  const handleOpenAddMember = () => {
+    setIsEditMode(false);
+    setNewMember({
+      id: 0,
+      name: '',
+      role: '',
+      email: '',
+      phone: '',
+      department: '',
+      status: 'active',
+      tasks: 0,
+      completedTasks: 0
+    });
+    setFormErrors({});
+    setIsAddMemberOpen(true);
+  };
+  
+  // Üye düzenleme modalını aç
+  const handleEditMember = (member: TeamMember) => {
+    setIsEditMode(true);
+    setNewMember({...member});
+    setFormErrors({});
+    setIsAddMemberOpen(true);
+  };
+  
+  // Form alanlarını güncelle
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }> | SelectChangeEvent<string>) => {
+    const { name, value } = e.target;
+    if (name) {
+      setNewMember(prev => ({
+        ...prev,
+        [name]: value
+      }));
+      
+      // Hata varsa temizle
+      if (formErrors[name]) {
+        setFormErrors(prev => {
+          const newErrors = {...prev};
+          delete newErrors[name];
+          return newErrors;
+        });
+      }
+    }
+  };
+  
+  // Form doğrulama
+  const validateForm = () => {
+    const errors: Record<string, string> = {};
+    
+    // Ad kontrolü
+    if (!newMember.name.trim()) {
+      errors.name = 'Ad alanı zorunludur';
+    } else if (newMember.name.trim().length < 2) {
+      errors.name = 'Ad en az 2 karakter olmalıdır';
+    }
+    
+    // Rol kontrolü
+    if (!newMember.role.trim()) {
+      errors.role = 'Rol alanı zorunludur';
+    }
+    
+    // E-posta kontrolü
+    if (!newMember.email.trim()) {
+      errors.email = 'E-posta alanı zorunludur';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newMember.email)) {
+      errors.email = 'Geçerli bir e-posta adresi giriniz';
+    } else if (!isEditMode) {
+      // Yeni üye eklenirken e-posta benzersizliği kontrolü
+      const existingMember = teamMembers.find(
+        m => m.email.toLowerCase() === newMember.email.toLowerCase()
+      );
+      if (existingMember) {
+        errors.email = 'Bu e-posta adresi zaten kullanılıyor';
+      }
+    }
+    
+    // Telefon kontrolü
+    if (!newMember.phone.trim()) {
+      errors.phone = 'Telefon alanı zorunludur';
+    } else if (!/^\+?[0-9\s-]{10,15}$/.test(newMember.phone)) {
+      errors.phone = 'Geçerli bir telefon numarası giriniz';
+    }
+    
+    // Departman kontrolü
+    if (!newMember.department) {
+      errors.department = 'Departman seçimi zorunludur';
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+  
+  // Üye ekle/düzenle
+  const handleSaveMember = async () => {
+    // Form doğrulama
+    if (!validateForm()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
+    try {
+      // Yeni üye mi yoksa düzenleme mi?
+      if (isEditMode) {
+        // Mevcut üyeyi güncelle
+        const updatedMembers = teamMembers.map(member => 
+          member.id === newMember.id ? newMember : member
+        );
+        
+        setTeamMembers(updatedMembers);
+        saveTeamMembersToStorage(updatedMembers);
+        
+        // Filtrelenmiş listeyi güncelle
+        applyFilters(searchQuery, selectedDepartment);
+        
+        // Başarı mesajı
+        notificationService.showNotification(
+          `${newMember.name} başarıyla güncellendi`,
+          NotificationType.SUCCESS
+        );
+        
+        // Aktif kullanıcı güncellendiyse state'i güncelle
+        if (currentUser?.id === newMember.id) {
+          setCurrentUserState(newMember);
+        }
+      } else {
+        // Yeni üye ID'si oluştur
+        const maxId = teamMembers.reduce((max, member) => Math.max(max, member.id), 0);
+        const newId = maxId + 1;
+        
+        // Yeni üye oluştur
+        const memberToAdd: TeamMember = {
+          ...newMember,
+          id: newId,
+          tasks: 0,
+          completedTasks: 0
+        };
+        
+        // Üyeyi ekle
+        const updatedMembers = [...teamMembers, memberToAdd];
+        setTeamMembers(updatedMembers);
+        saveTeamMembersToStorage(updatedMembers);
+        
+        // Filtrelenmiş listeyi güncelle
+        applyFilters(searchQuery, selectedDepartment);
+        
+        // Başarı mesajı
+        notificationService.showNotification(
+          `${memberToAdd.name} başarıyla eklendi`,
+          NotificationType.SUCCESS
+        );
+      }
+    } catch (error) {
+      console.error('Üye kaydedilirken hata oluştu:', error);
+      notificationService.showNotification(
+        'Üye kaydedilirken bir hata oluştu',
+        NotificationType.ERROR
+      );
+    } finally {
+      setIsSubmitting(false);
+      setIsAddMemberOpen(false);
+    }
+  };

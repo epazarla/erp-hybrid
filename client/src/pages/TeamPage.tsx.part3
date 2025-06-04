@@ -1,0 +1,253 @@
+  // Silme onay diyaloğunu aç
+  const handleDeleteConfirmation = (member: TeamMember) => {
+    setMemberToDelete(member);
+    setDeleteDialogOpen(true);
+  };
+  
+  // Silme onay diyaloğunu kapat
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setMemberToDelete(null);
+  };
+  
+  // Üye sil
+  const handleDeleteMember = () => {
+    if (!memberToDelete) return;
+    
+    try {
+      // Silinen üyeyi sakla (geri alma için)
+      setDeletedMember(memberToDelete);
+      
+      // Üyeyi sil
+      const updatedMembers = teamMembers.filter(member => member.id !== memberToDelete.id);
+      setTeamMembers(updatedMembers);
+      saveTeamMembersToStorage(updatedMembers);
+      
+      // Filtrelenmiş listeyi güncelle
+      applyFilters(searchQuery, selectedDepartment);
+      
+      // Snackbar göster
+      setSnackbarMessage(`${memberToDelete.name} silindi`);
+      setSnackbarOpen(true);
+      
+      // Aktif kullanıcı silindiyse state'i temizle
+      if (currentUser?.id === memberToDelete.id) {
+        setCurrentUserState(null);
+      }
+      
+      // Diyaloğu kapat
+      handleCloseDeleteDialog();
+    } catch (error) {
+      console.error('Üye silinirken hata oluştu:', error);
+      notificationService.showNotification(
+        'Üye silinirken bir hata oluştu',
+        NotificationType.ERROR
+      );
+    }
+  };
+  
+  // Silinen üyeyi geri al
+  const handleUndoDelete = () => {
+    if (!deletedMember) return;
+    
+    try {
+      // Üyeyi geri ekle
+      const updatedMembers = [...teamMembers, deletedMember];
+      setTeamMembers(updatedMembers);
+      saveTeamMembersToStorage(updatedMembers);
+      
+      // Filtrelenmiş listeyi güncelle
+      applyFilters(searchQuery, selectedDepartment);
+      
+      // Başarı mesajı
+      notificationService.showNotification(
+        `${deletedMember.name} geri alındı`,
+        NotificationType.SUCCESS
+      );
+      
+      // Snackbar kapat
+      setSnackbarOpen(false);
+      
+      // Silinen üye state'ini temizle
+      setDeletedMember(null);
+    } catch (error) {
+      console.error('Üye geri alınırken hata oluştu:', error);
+      notificationService.showNotification(
+        'Üye geri alınırken bir hata oluştu',
+        NotificationType.ERROR
+      );
+    }
+  };
+  
+  // Snackbar kapatma işlevi
+  const handleCloseSnackbar = () => {
+    setSnackbarOpen(false);
+  };
+  
+  // Grid görünümü
+  const renderGridView = () => {
+    return (
+      <Grid container spacing={3}>
+        {filteredMembers.map(member => (
+          <Grid item xs={12} sm={6} md={4} key={member.id}>
+            <Card 
+              sx={{
+                height: '100%', 
+                display: 'flex', 
+                flexDirection: 'column',
+                bgcolor: currentUser?.id === member.id ? 'rgba(33, 150, 243, 0.1)' : 'inherit',
+                borderLeft: currentUser?.id === member.id ? '4px solid #2196f3' : 'none'
+              }}
+            >
+              <CardContent sx={{ flexGrow: 1 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                  <Avatar 
+                    src={member.avatar} 
+                    sx={{ width: 56, height: 56, mr: 2 }}
+                  >
+                    {member.name.charAt(0)}
+                  </Avatar>
+                  <Box>
+                    <Typography variant="h6" component="div">
+                      {member.name}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {member.role}
+                    </Typography>
+                  </Box>
+                </Box>
+                
+                <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                  <Chip 
+                    label={statusTexts[member.status]} 
+                    color={statusColors[member.status] as any} 
+                    size="small" 
+                    sx={{ mr: 1 }}
+                  />
+                  {currentUser?.id === member.id && (
+                    <Chip 
+                      label="Aktif Kullanıcı" 
+                      color="primary" 
+                      size="small" 
+                    />
+                  )}
+                </Box>
+                
+                <Box sx={{ mb: 1 }}>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                    <MailIcon fontSize="small" sx={{ mr: 1 }} />
+                    {member.email}
+                  </Typography>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center', mb: 0.5 }}>
+                    <PhoneIcon fontSize="small" sx={{ mr: 1 }} />
+                    {member.phone}
+                  </Typography>
+                  <Typography variant="body2" sx={{ display: 'flex', alignItems: 'center' }}>
+                    <BadgeIcon fontSize="small" sx={{ mr: 1 }} />
+                    {member.department}
+                  </Typography>
+                </Box>
+              </CardContent>
+              <CardActions>
+                <Button
+                  size="small"
+                  color="primary"
+                  variant={currentUser?.id === member.id ? "contained" : "outlined"}
+                  startIcon={<LoginIcon />}
+                  onClick={() => handleSwitchUser(member)}
+                  disabled={member.status !== 'active'}
+                >
+                  {currentUser?.id === member.id ? 'Aktif' : 'Giriş Yap'}
+                </Button>
+                <IconButton size="small" onClick={() => handleEditMember(member)}>
+                  <EditIcon />
+                </IconButton>
+                <IconButton size="small" onClick={() => handleDeleteConfirmation(member)}>
+                  <DeleteIcon />
+                </IconButton>
+              </CardActions>
+            </Card>
+          </Grid>
+        ))}
+      </Grid>
+    );
+  };
+  
+  // Liste görünümü
+  const renderListView = () => {
+    return (
+      <List sx={{ bgcolor: 'background.paper' }}>
+        {filteredMembers.map(member => (
+          <React.Fragment key={member.id}>
+            <ListItem
+              sx={{
+                bgcolor: currentUser?.id === member.id ? 'rgba(33, 150, 243, 0.1)' : 'inherit',
+                borderLeft: currentUser?.id === member.id ? '4px solid #2196f3' : 'none'
+              }}
+              secondaryAction={
+                <Box>
+                  <Button
+                    size="small"
+                    color="primary"
+                    variant={currentUser?.id === member.id ? "contained" : "outlined"}
+                    startIcon={<LoginIcon />}
+                    onClick={() => handleSwitchUser(member)}
+                    disabled={member.status !== 'active'}
+                    sx={{ mr: 1 }}
+                  >
+                    {currentUser?.id === member.id ? 'Aktif' : 'Giriş Yap'}
+                  </Button>
+                  <IconButton edge="end" aria-label="edit" onClick={() => handleEditMember(member)}>
+                    <EditIcon />
+                  </IconButton>
+                  <IconButton edge="end" aria-label="delete" onClick={() => handleDeleteConfirmation(member)}>
+                    <DeleteIcon />
+                  </IconButton>
+                </Box>
+              }
+            >
+              <ListItemAvatar>
+                <Avatar src={member.avatar}>
+                  {member.name.charAt(0)}
+                </Avatar>
+              </ListItemAvatar>
+              <ListItemText
+                primary={
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Typography variant="subtitle1" component="span">
+                      {member.name}
+                    </Typography>
+                    <Chip 
+                      label={statusTexts[member.status]} 
+                      color={statusColors[member.status] as any} 
+                      size="small" 
+                      sx={{ ml: 1 }}
+                    />
+                    {currentUser?.id === member.id && (
+                      <Chip 
+                        label="Aktif Kullanıcı" 
+                        color="primary" 
+                        size="small" 
+                        sx={{ ml: 1 }}
+                      />
+                    )}
+                  </Box>
+                }
+                secondary={
+                  <>
+                    <Typography component="span" variant="body2" color="text.primary">
+                      {member.role} - {member.department}
+                    </Typography>
+                    <Typography component="div" variant="body2">
+                      {member.email} | {member.phone}
+                    </Typography>
+                  </>
+                }
+              />
+            </ListItem>
+            <Divider variant="inset" component="li" />
+          </React.Fragment>
+        ))}
+      </List>
+    );
+  };

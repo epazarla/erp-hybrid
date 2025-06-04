@@ -1,0 +1,26 @@
+// Yaklaşan görevler güncellendiğinde çağrılacak fonksiyon
+function handleUpcomingTasksUpdated(event: CustomEvent<any>) {
+  console.log(`[${new Date().toISOString()}] Dashboard: Yaklaşan görevler güncellendi, anlık yenileniyor...`, event?.detail);
+  
+  try {
+    if (event?.detail) {
+      // Event'ten gelen yaklaşan görevleri kullan
+      if (event.detail.upcomingTasks) {
+        const upcomingTasksData = event.detail.upcomingTasks;
+        console.log(`[${new Date().toISOString()}] Dashboard: Yaklaşan görevler event'ten alındı, sayı: ${upcomingTasksData.length}`);
+        
+        // En fazla 5 yaklaşan görevi göster
+        setUpcomingTasks(upcomingTasksData.slice(0, 5));
+      } else {
+        console.log(`[${new Date().toISOString()}] Dashboard: Yaklaşan görevler event'inde veri yok`);
+      }
+    } else {
+      console.log(`[${new Date().toISOString()}] Dashboard: Yaklaşan görevler event detayları yok`);
+    }
+    
+    // Görev analizlerini yap
+    analyzeTasksData(getAllTasks());
+  } catch (error) {
+    console.error(`[${new Date().toISOString()}] Dashboard: Yaklaşan görevler güncellenirken hata oluştu:`, error);
+  }
+}

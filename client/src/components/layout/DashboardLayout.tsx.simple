@@ -1,0 +1,68 @@
+import React from 'react';
+import { 
+  Box, 
+  CssBaseline, 
+  AppBar, 
+  Toolbar, 
+  Typography, 
+  Container,
+  useTheme,
+  ThemeProvider
+} from '@mui/material';
+import { lightTheme, darkTheme } from '../../theme';
+
+interface DashboardLayoutProps {
+  children: React.ReactNode;
+  onLogout: () => void;
+  user: {
+    name: string;
+    email: string;
+    role: string;
+  };
+  onPageChange?: (page: string) => void;
+  onThemeToggle?: () => void;
+  darkMode?: boolean;
+}
+
+export default function DashboardLayout({ 
+  children, 
+  onLogout, 
+  user, 
+  onPageChange, 
+  onThemeToggle, 
+  darkMode = false
+}: DashboardLayoutProps) {
+  const theme = useTheme();
+  
+  return (
+    <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+        <CssBaseline />
+        
+        {/* Üst Çubuk */}
+        <AppBar position="static">
+          <Toolbar>
+            <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+              E-Pazarla ERP
+            </Typography>
+          </Toolbar>
+        </AppBar>
+        
+        {/* Ana İçerik */}
+        <Box 
+          component="main" 
+          sx={{ 
+            flexGrow: 1, 
+            py: 4,
+            display: 'flex',
+            justifyContent: 'center'
+          }}
+        >
+          <Container maxWidth="lg">
+            {children}
+          </Container>
+        </Box>
+      </Box>
+    </ThemeProvider>
+  );
+}

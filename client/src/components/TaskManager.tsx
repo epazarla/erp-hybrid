@@ -1,0 +1,317 @@
+import React, { useState, useEffect } from 'react';
+import {
+  Container,
+  Paper,
+  Typography,
+  Box,
+  Grid,
+  Tabs,
+  Tab,
+  CircularProgress,
+  Alert,
+  Divider,
+  useTheme,
+  useMediaQuery,
+  Button,
+  TextField,
+  MenuItem,
+  IconButton,
+  Snackbar,
+  Chip
+} from '@mui/material';
+import {
+  Assignment as AssignmentIcon,
+  Delete as DeleteIcon,
+  AssignmentTurnedIn as AssignmentTurnedInIcon,
+  AssignmentInd as AssignmentIndIcon,
+  Add as AddIcon,
+  FilterList as FilterListIcon,
+  Restore as RestoreIcon
+} from '@mui/icons-material';
+import { Task, getAllTasks, addTask, deleteTask, restoreTask, TASK_STATUSES, TASK_PRIORITIES, TASKS_UPDATED_EVENT, clearAllTasks } from '../services/TaskService';
+import { User, getAllUsers, getActiveUsers } from '../services/UserService';
+import TaskList from './TaskList';
+import TaskForm from './TaskForm';
+
+/**
+ * Görev Yönetimi Bileşeni
+ * 
+ * Bu bileşen, görev yönetimi arayüzünün ana bileşenidir.
+ * Görevleri listeleme, filtreleme, ekleme, düzenleme ve silme işlevlerini yönetir.
+ */
+export default function TaskManager() {
+  // Tema ve medya sorgusu
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
+  // Temel state'ler
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [activeTab, setActiveTab] = useState(0);
+  
+  // Mevcut kullanıcı (normalde auth sisteminden gelir)
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  
+  // Görevleri temizle
+  useEffect(() => {
+    // İlk yüklemede tüm görevleri temizle
+    clearAllTasks();
+  }, []);
+  
+  // Görevleri yükle
+  useEffect(() => {
+    const loadTasks = async () => {
+      try {
+        setLoading(true);
+        setError('');
+        
+        // Görevleri getir
+        const allTasks = getAllTasks();
+        
+        // Görevleri kontrol et ve ayarla
+        if (Array.isArray(allTasks)) {
+          setTasks(allTasks);
+          console.log(`[${new Date().toISOString()}] ${allTasks.length} görev yüklendi`);
+        } else {
+          console.error(`[${new Date().toISOString()}] Yüklenen görevler geçerli bir dizi değil`);
+          setTasks([]);
+        }
+      } catch (err: any) {
+        console.error(`[${new Date().toISOString()}] Görevler yüklenirken hata:`, err);
+        setError('Görevler yüklenirken bir hata oluştu: ' + (err.message || 'Bilinmeyen hata'));
+        setTasks([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadTasks();
+    
+    // Görev güncellemelerini dinle
+    const handleTasksUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log(`[${new Date().toISOString()}] Görev güncelleme olayı alındı:`, 
+        customEvent.detail ? `Görev sayısı: ${customEvent.detail.tasks?.length || 0}` : 'Detay yok');
+      
+      // Görevleri yeniden yükle
+      setRefreshTrigger(prev => prev + 1);
+    };
+    
+    window.addEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
+    
+    return () => {
+      window.removeEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
+    };
+  }, [refreshTrigger]);
+  
+  // Kullanıcıları yükle
+  useEffect(() => {
+    const loadUsers = async () => {
+      try {
+        // Aktif kullanıcıları getir
+        const activeUsers = getActiveUsers();
+        setUsers(activeUsers);
+        
+        // İlk kullanıcıyı mevcut kullanıcı olarak ayarla (demo amaçlı)
+        if (activeUsers.length > 0 && !currentUser) {
+          setCurrentUser(activeUsers[0]);
+        }
+        
+        console.log(`${activeUsers.length} aktif kullanıcı yüklendi`);
+      } catch (err) {
+        console.error('Kullanıcılar yüklenirken hata:', err);
+      }
+    };
+    
+    loadUsers();
+  }, [currentUser]);
+  
+  // Görevler değiştiğinde yeniden yükle
+  const handleTasksChanged = () => {
+    console.log('Görevler değişti, yenileniyor...');
+    setRefreshTrigger(prev => prev + 1);
+  };
+  
+  // Yeni görev oluşturulduğunda yeniden yükle
+  const handleTaskCreated = () => {
+    console.log('Yeni görev oluşturuldu, yenileniyor...');
+    setRefreshTrigger(prev => prev + 1);
+    // Yeni görev oluşturulduğunda görevler sekmesine geç
+    setActiveTab(0);
+  };
+  
+  // Tab değişikliğini işle
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setActiveTab(newValue);
+  };
+  
+  // Görev istatistiklerini hesapla
+  const taskStats = {
+    total: tasks.length,
+    assigned: currentUser ? tasks.filter(task => task.assigned_to === currentUser.id).length : 0,
+    completed: tasks.filter(task => task.status === 'Tamamlandı').length,
+    inProgress: tasks.filter(task => task.status === 'Devam Ediyor').length,
+    pending: tasks.filter(task => task.status === 'Bekliyor').length
+  };
+
+  // Görevleri filtrele
+  const getFilteredTasks = () => {
+    if (!currentUser) return [];
+    
+    switch (activeTab) {
+      case 0: // Tüm görevler
+        return tasks;
+      case 1: // Bana atananlar
+        return tasks.filter(task => task.assigned_to === currentUser.id);
+      case 2: // Tamamlananlar
+        return tasks.filter(task => task.status === 'Tamamlandı');
+      default:
+        return tasks;
+    }
+  };
+  
+  return (
+    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
+      <Paper 
+        elevation={0} 
+        sx={{ 
+          p: 3, 
+          borderRadius: '16px',
+          border: '1px solid',
+          borderColor: 'divider'
+        }}
+      >
+        <Box sx={{ mb: 3, display: 'flex', alignItems: 'center' }}>
+          <AssignmentIcon sx={{ mr: 1, color: 'primary.main' }} />
+          <Typography variant="h5" component="h1" gutterBottom sx={{ flexGrow: 1, m: 0 }}>
+            Görev Yönetimi
+          </Typography>
+        </Box>
+        
+        <Divider sx={{ mb: 3 }} />
+        
+        {error && (
+          <Alert severity="error" sx={{ mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+        
+        <Tabs 
+          value={activeTab} 
+          onChange={handleTabChange}
+          variant={isMobile ? "scrollable" : "standard"}
+          scrollButtons={isMobile ? "auto" : undefined}
+          sx={{ mb: 3, borderBottom: 1, borderColor: 'divider' }}
+        >
+          <Tab 
+            icon={<AssignmentIcon />} 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Typography component="span">Tüm Görevler</Typography>
+                <Typography 
+                  component="span" 
+                  sx={{ 
+                    ml: 1, 
+                    bgcolor: 'primary.main', 
+                    color: 'white', 
+                    borderRadius: '50%', 
+                    width: 22, 
+                    height: 22, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {taskStats.total}
+                </Typography>
+              </Box>
+            } 
+          />
+          <Tab 
+            icon={<AssignmentIndIcon />} 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Typography component="span">Bana Atananlar</Typography>
+                <Typography 
+                  component="span" 
+                  sx={{ 
+                    ml: 1, 
+                    bgcolor: 'info.main', 
+                    color: 'white', 
+                    borderRadius: '50%', 
+                    width: 22, 
+                    height: 22, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {taskStats.assigned}
+                </Typography>
+              </Box>
+            } 
+          />
+          <Tab 
+            icon={<AssignmentTurnedInIcon />} 
+            label={
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <Typography component="span">Tamamlananlar</Typography>
+                <Typography 
+                  component="span" 
+                  sx={{ 
+                    ml: 1, 
+                    bgcolor: 'success.main', 
+                    color: 'white', 
+                    borderRadius: '50%', 
+                    width: 22, 
+                    height: 22, 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'center',
+                    fontSize: '0.75rem',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  {taskStats.completed}
+                </Typography>
+              </Box>
+            } 
+          />
+        </Tabs>
+        
+        <Grid container spacing={3}>
+          <Grid item xs={12} md={8} lg={9}>
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}>
+                <CircularProgress />
+              </Box>
+            ) : (
+              <TaskList 
+                tasks={getFilteredTasks()} 
+                users={users}
+                onTasksChanged={handleTasksChanged} 
+              />
+            )}
+          </Grid>
+          
+          <Grid item xs={12} md={4} lg={3}>
+            {currentUser && (
+              <TaskForm 
+                currentUser={currentUser}
+                users={users}
+                onTaskCreated={handleTaskCreated} 
+              />
+            )}
+          </Grid>
+        </Grid>
+      </Paper>
+    </Container>
+  );
+}

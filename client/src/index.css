@@ -1,0 +1,288 @@
+:root {
+  --primary: #3498db;
+  --primary-dark: #2980b9;
+  --secondary: #2ecc71;
+  --secondary-dark: #27ae60;
+  --danger: #e74c3c;
+  --warning: #f39c12;
+  --light: #f5f5f5;
+  --dark: #333;
+  --gray: #95a5a6;
+  --border-radius: 4px;
+  --shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #f9f9f9;
+  color: var(--dark);
+  width: 100%;
+  overflow-x: hidden;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.logout-btn {
+  background-color: var(--danger);
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: var(--border-radius);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.logout-btn:hover {
+  background-color: #c0392b;
+}
+
+/* Auth Form Styles */
+.auth-form {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 25px;
+  background-color: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+}
+
+.auth-form h2 {
+  margin-bottom: 20px;
+  text-align: center;
+  color: var(--primary-dark);
+}
+
+.auth-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.auth-form input,
+.auth-form select {
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: var(--border-radius);
+  font-size: 16px;
+}
+
+.auth-form button {
+  padding: 12px;
+  background-color: var(--primary);
+  color: white;
+  border: none;
+  border-radius: var(--border-radius);
+  font-size: 16px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.auth-form button:hover {
+  background-color: var(--primary-dark);
+}
+
+.auth-form .error {
+  color: var(--danger);
+  font-size: 14px;
+  margin-top: 5px;
+}
+
+.auth-form .switch-mode {
+  margin-top: 15px;
+  text-align: center;
+}
+
+.auth-form .switch-mode button {
+  background: none;
+  border: none;
+  color: var(--primary);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 0;
+  text-decoration: underline;
+}
+
+/* Task Manager Styles */
+.task-manager {
+  background-color: white;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+
+.task-tabs {
+  display: flex;
+  border-bottom: 1px solid #eee;
+}
+
+.task-tabs .tab {
+  padding: 15px 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  flex: 1;
+  transition: background-color 0.3s;
+}
+
+.task-tabs .tab:hover {
+  background-color: #f5f5f5;
+}
+
+.task-tabs .tab.active {
+  background-color: var(--primary);
+  color: white;
+}
+
+.task-content {
+  padding: 20px;
+}
+
+/* Task List Styles */
+.task-list h2 {
+  margin-bottom: 20px;
+  color: var(--dark);
+}
+
+.task-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.task-card {
+  padding: 15px;
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow);
+  background-color: white;
+  border-left: 4px solid var(--gray);
+}
+
+.task-card.yeni {
+  border-left-color: var(--primary);
+}
+
+.task-card.devam {
+  border-left-color: var(--warning);
+}
+
+.task-card.tamamlandi {
+  border-left-color: var(--secondary);
+}
+
+.task-card h3 {
+  margin-bottom: 10px;
+  color: var(--dark);
+}
+
+.task-card .description {
+  margin-bottom: 15px;
+  color: var(--gray);
+  font-size: 14px;
+}
+
+.task-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+}
+
+.task-meta .status {
+  padding: 3px 8px;
+  border-radius: 12px;
+  background-color: var(--light);
+}
+
+.loading, .error, .empty-list {
+  text-align: center;
+  padding: 20px;
+  color: var(--gray);
+}
+
+h1 {
+  color: #0078d4;
+  margin-bottom: 8px;
+}
+
+/* Ortalama için özel stiller - Güçlendirilmiş */
+.centered-content {
+  width: 100% !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+#root {
+  width: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+}
+
+/* Ana içerik alanı için ortalama */
+.content-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  width: 100% !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+  padding: 24px !important;
+}
+
+/* Drawer açıkken içerik ortalama */
+.main-content {
+  display: flex !important;
+  justify-content: center !important;
+  width: 100% !important;
+}
+
+/* Grid container ortalama */
+.MuiGrid-container {
+  width: 100% !important;
+  margin: 0 !important;
+}
+
+/* Dashboard sayfası için özel stil */
+.dashboard-page {
+  width: 100% !important;
+  max-width: 1400px !important;
+  margin: 0 auto !important;
+}

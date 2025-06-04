@@ -1,0 +1,369 @@
+  return (
+    <Box sx={{ width: '100%' }}>
+      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center' }}>
+          <Typography variant="h4" component="h1" gutterBottom>
+            Ekip Yönetimi
+          </Typography>
+          {currentUser && (
+            <Chip
+              icon={<AccountCircleIcon />}
+              label={`Aktif Kullanıcı: ${currentUser.name}`}
+              color="primary"
+              variant="outlined"
+              sx={{ ml: 2 }}
+            />
+          )}
+          {pendingApprovalUsers.length > 0 && (
+            <Chip
+              icon={<HourglassEmptyIcon />}
+              label={`Onay Bekleyen: ${pendingApprovalUsers.length}`}
+              color="warning"
+              variant="outlined"
+              sx={{ ml: 2 }}
+            />
+          )}
+        </Box>
+        
+        <Box>
+          <Button
+            variant="contained"
+            color="primary"
+            startIcon={<PersonAddIcon />}
+            onClick={handleOpenAddMember}
+            sx={{ mr: 1 }}
+          >
+            Yeni Üye Ekle
+          </Button>
+        </Box>
+      </Box>
+      
+      {/* Onay bekleyen kullanıcılar */}
+      {pendingApprovalUsers.length > 0 && (
+        <Paper sx={{ mb: 3, p: 2 }}>
+          <Typography variant="h6" sx={{ mb: 2 }}>
+            Onay Bekleyen Kullanıcılar ({pendingApprovalUsers.length})
+          </Typography>
+          
+          <Grid container spacing={2}>
+            {pendingApprovalUsers.map(user => (
+              <Grid item xs={12} sm={6} md={4} key={user.id}>
+                <Card>
+                  <CardContent>
+                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
+                      <Avatar sx={{ mr: 2 }}>
+                        {user.name?.charAt(0) || 'U'}
+                      </Avatar>
+                      <Box>
+                        <Typography variant="h6">{user.name}</Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {user.email}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                          {user.department || 'Departman belirtilmemiş'}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Kayıt: {new Date(user.registrationDate).toLocaleString()}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  </CardContent>
+                  <CardActions>
+                    <Button 
+                      startIcon={<CheckCircleIcon />} 
+                      variant="contained" 
+                      color="success"
+                      size="small"
+                      onClick={() => handleApproveUser(user.id)}
+                    >
+                      Onayla
+                    </Button>
+                    <Button 
+                      startIcon={<CancelIcon />} 
+                      variant="contained" 
+                      color="error"
+                      size="small"
+                      onClick={() => handleRejectUser(user.id)}
+                    >
+                      Reddet
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Paper>
+      )}
+      
+      {/* Arama ve Filtreler */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} sm={6} md={4}>
+            <TextField
+              fullWidth
+              placeholder="Ara..."
+              value={searchQuery}
+              onChange={handleSearch}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <SearchIcon />
+                  </InputAdornment>
+                ),
+              }}
+              size="small"
+            />
+          </Grid>
+          
+          <Grid item xs={12} sm={6} md={4}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Departman</InputLabel>
+              <Select
+                value={selectedDepartment}
+                label="Departman"
+                onChange={(e) => handleDepartmentChange(e.target.value as string)}
+              >
+                {departments.map(department => (
+                  <MenuItem key={department} value={department}>
+                    {department}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Grid>
+          
+          <Grid item xs={12} sm={12} md={4}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Tabs
+                value={viewType}
+                onChange={(e, newValue) => setViewType(newValue as ViewType)}
+                aria-label="Görünüm tipi"
+              >
+                <Tab 
+                  icon={<ViewModuleIcon />} 
+                  aria-label="grid" 
+                  value="grid"
+                  sx={{ minWidth: 'auto' }}
+                />
+                <Tab 
+                  icon={<ViewListIcon />} 
+                  aria-label="list" 
+                  value="list"
+                  sx={{ minWidth: 'auto' }}
+                />
+              </Tabs>
+            </Box>
+          </Grid>
+        </Grid>
+      </Paper>
+      
+      {/* Ekip üyeleri listesi */}
+      {filteredMembers.length === 0 ? (
+        <Paper sx={{ p: 4, textAlign: 'center' }}>
+          <Typography variant="h6" color="text.secondary">
+            Ekip üyesi bulunamadı
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+            Yeni bir ekip üyesi ekleyin veya arama kriterlerinizi değiştirin
+          </Typography>
+        </Paper>
+      ) : (
+        viewType === 'grid' ? renderGridView() : renderListView()
+      )}
+      
+      {/* Üye ekleme/düzenleme diyaloğu */}
+      <Dialog 
+        open={isAddMemberOpen} 
+        onClose={() => setIsAddMemberOpen(false)}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>
+          {isEditMode ? 'Ekip Üyesini Düzenle' : 'Yeni Ekip Üyesi Ekle'}
+        </DialogTitle>
+        
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 0.5 }}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Ad Soyad"
+                name="name"
+                value={newMember.name}
+                onChange={handleFormChange}
+                fullWidth
+                required
+                error={!!formErrors.name}
+                helperText={formErrors.name}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Rol"
+                name="role"
+                value={newMember.role}
+                onChange={handleFormChange}
+                fullWidth
+                required
+                error={!!formErrors.role}
+                helperText={formErrors.role}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="E-posta"
+                name="email"
+                type="email"
+                value={newMember.email}
+                onChange={handleFormChange}
+                fullWidth
+                required
+                error={!!formErrors.email}
+                helperText={formErrors.email}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <TextField
+                label="Telefon"
+                name="phone"
+                value={newMember.phone}
+                onChange={handleFormChange}
+                fullWidth
+                required
+                error={!!formErrors.phone}
+                helperText={formErrors.phone}
+              />
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required error={!!formErrors.department}>
+                <InputLabel>Departman</InputLabel>
+                <Select
+                  name="department"
+                  value={newMember.department}
+                  onChange={handleFormChange}
+                  label="Departman"
+                >
+                  {departments.filter(d => d !== 'Tümü').map(department => (
+                    <MenuItem key={department} value={department}>
+                      {department}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {formErrors.department && (
+                  <Typography color="error" variant="caption" sx={{ mt: 0.5, ml: 1.5 }}>
+                    {formErrors.department}
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required>
+                <InputLabel>Durum</InputLabel>
+                <Select
+                  name="status"
+                  value={newMember.status}
+                  onChange={handleFormChange}
+                  label="Durum"
+                >
+                  <MenuItem value="active">Aktif</MenuItem>
+                  <MenuItem value="inactive">Pasif</MenuItem>
+                  <MenuItem value="vacation">İzinde</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+            
+            <Grid item xs={12}>
+              <TextField
+                label="Profil Resmi URL"
+                name="avatar"
+                value={newMember.avatar || ''}
+                onChange={handleFormChange}
+                fullWidth
+                placeholder="https://example.com/avatar.jpg"
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        
+        <DialogActions>
+          <Button 
+            onClick={() => setIsAddMemberOpen(false)} 
+            color="inherit"
+            disabled={isSubmitting}
+          >
+            İptal
+          </Button>
+          <Button 
+            onClick={handleSaveMember} 
+            variant="contained"
+            disabled={isSubmitting}
+            startIcon={isSubmitting ? <CircularProgress size={20} color="inherit" /> : null}
+          >
+            {isEditMode ? 'Güncelle' : 'Ekle'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Kullanıcı değişikliği bildirim snackbar */}
+      <Snackbar
+        open={switchUserSnackbar.open}
+        autoHideDuration={3000}
+        onClose={() => setSwitchUserSnackbar({...switchUserSnackbar, open: false})}
+        message={switchUserSnackbar.message}
+        action={
+          <Button color="inherit" size="small" onClick={() => setSwitchUserSnackbar({...switchUserSnackbar, open: false})}>
+            TAMAM
+          </Button>
+        }
+      />
+      
+      {/* Silme Onay Diyaloğu */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDeleteDialog}
+        aria-labelledby="delete-dialog-title"
+        aria-describedby="delete-dialog-description"
+      >
+        <DialogTitle id="delete-dialog-title">
+          Ekip Üyesini Sil
+        </DialogTitle>
+        <DialogContent>
+          <Typography id="delete-dialog-description">
+            {memberToDelete && (
+              <><b>{memberToDelete.name}</b> adlı ekip üyesini silmek istediğinize emin misiniz? Bu işlem geri alınabilir.</>
+            )}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} color="primary">
+            İptal
+          </Button>
+          <Button 
+            onClick={handleDeleteMember} 
+            color="error" 
+            variant="contained"
+          >
+            Sil
+          </Button>
+        </DialogActions>
+      </Dialog>
+      
+      {/* Silme geri alma snackbar */}
+      <Snackbar
+        open={snackbarOpen}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        message={snackbarMessage}
+        action={
+          <Button color="secondary" size="small" onClick={handleUndoDelete}>
+            GERİ AL
+          </Button>
+        }
+      />
+    </Box>
+  );
+}

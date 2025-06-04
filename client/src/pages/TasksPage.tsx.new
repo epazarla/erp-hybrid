@@ -1,0 +1,40 @@
+import React from 'react';
+import { Box, Typography, Paper, Button, Container, Alert } from '@mui/material';
+
+/**
+ * Görev Yönetimi Sayfası
+ * 
+ * Bu sayfa görev yönetim sisteminin giriş noktasıdır.
+ */
+const TasksPage: React.FC = () => {
+  return (
+    <Container maxWidth="lg">
+      <Box sx={{ mt: 4, mb: 4 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Görev Yönetimi
+        </Typography>
+        
+        <Alert severity="info" sx={{ mb: 3 }}>
+          Görev yönetim sistemi şu anda bakım modundadır.
+        </Alert>
+        
+        <Paper sx={{ p: 4, mt: 4, textAlign: 'center' }}>
+          <Typography variant="h5" gutterBottom>
+            Görev yönetim sistemi yeniden yapılandırılıyor
+          </Typography>
+          <Typography variant="body1" paragraph>
+            Görev yönetim sistemimiz şu anda bakım modundadır. Daha stabil ve güçlü bir deneyim için yeniden tasarlanıyor.
+          </Typography>
+          <Typography variant="body1" paragraph>
+            Çok yakında yeni özelliklerle geri döneceğiz.
+          </Typography>
+          <Button variant="contained" color="primary" disabled>
+            Yeni Görev Ekle
+          </Button>
+        </Paper>
+      </Box>
+    </Container>
+  );
+};
+
+export default TasksPage;

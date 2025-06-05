@@ -31,7 +31,7 @@ services:
       - key: REACT_APP_API_URL
         value: https://erp-hybrid-api.onrender.com
     autoDeploy: true
-    plan: free
+    plan: starter
 
 databases:
   - name: erp-hybrid-db

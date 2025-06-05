@@ -4,7 +4,7 @@ services:
     name: erp-hybrid-api
     env: node
     buildCommand: cd server && npm install
-    startCommand: cd server && npm start
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
@@ -20,9 +20,10 @@ services:
           property: connectionString
     plan: free
     region: frankfurt
+    autoDeploy: true
 
   # Frontend Static Site
-  - type: web
+  - type: static_site
     name: erp-hybrid-client
     env: static
     buildCommand: cd client && npm install && npm run build
@@ -38,3 +39,5 @@ databases:
     databaseName: erp_hybrid
     user: erp_hybrid_user
     plan: free
+    region: frankfurt
+    autoDeploy: true

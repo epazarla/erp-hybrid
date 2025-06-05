@@ -36,7 +36,6 @@ services:
         value: https://erp-hybrid-api.onrender.com
     autoDeploy: true
     plan: starter
-    region: frankfurt
     headers:
       - path: /*
         name: X-Frame-Options

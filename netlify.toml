@@ -1,15 +1,22 @@
 [build]
   command = "cd client && npm install && npm run build"
-  publish = "client/build"
+  publish = "client/dist"
   functions = "netlify/functions"
 
 [dev]
-  command = "cd client && npm start"
-  port = 3000
-  targetPort = 3000
-  publish = "client/build"
+  command = "cd client && npm run dev"
+  port = 5173
+  targetPort = 5173
+  publish = "client/dist"
 
 [[redirects]]
-  from = "/api/*"
-  to = "/.netlify/functions/:splat"
+  from = "/*"
+  to = "/index.html"
   status = 200
+
+[build.environment]
+  NODE_VERSION = "18.0.0"
+  NPM_FLAGS = "--legacy-peer-deps"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"

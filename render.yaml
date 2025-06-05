@@ -32,7 +32,8 @@ services:
       - key: REACT_APP_API_URL
         value: https://erp-hybrid-api.onrender.com
     autoDeploy: true
-    plan: free
+    region: frankfurt
+    plan: starter
     # Security Headers
     headers:
       # Basic security headers for all paths
@@ -69,7 +70,6 @@ services:
       # - type: proxy
       #   source: /api/*
       #   destination: https://erp-hybrid-api.onrender.com/api/$1
-    plan: starter
 
 databases:
   - name: erp-hybrid-db

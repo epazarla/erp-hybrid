@@ -1,3 +1,6 @@
+# Render Blueprint Specification
+# https://render.com/docs/blueprint-spec
+
 services:
   # Backend API Service
   - type: web
@@ -75,4 +78,3 @@ databases:
     user: erp_hybrid_user
     plan: free
     region: frankfurt
-    autoDeploy: true

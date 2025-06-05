@@ -1,6 +1,6 @@
 [build]
-  command = "cd client && npm install && npm run build"
   publish = "client/dist"
+  command = "cd client && npm install && npm run build"
   functions = "netlify/functions"
 
 [dev]
@@ -17,6 +17,10 @@
 [build.environment]
   NODE_VERSION = "18.0.0"
   NPM_FLAGS = "--legacy-peer-deps"
+  NETLIFY_NEXT_PLUGIN_SKIP = "true"
 
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+# SPA yönlendirmesi için
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

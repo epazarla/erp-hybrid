@@ -1,6 +1,6 @@
 [build]
-  publish = "client/dist"
   command = "cd client && npm install && npm run build"
+  publish = "client/dist"
   functions = "netlify/functions"
 
 [dev]
@@ -9,18 +9,31 @@
   targetPort = 5173
   publish = "client/dist"
 
+# Tüm istekleri index.html'e yönlendir (SPA için gerekli)
 [[redirects]]
   from = "/*"
   to = "/index.html"
+  status = 200
+  force = true
+
+# API isteklerini fonksiyonlara yönlendir
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
   status = 200
 
 [build.environment]
   NODE_VERSION = "18.0.0"
   NPM_FLAGS = "--legacy-peer-deps"
-  NETLIFY_NEXT_PLUGIN_SKIP = "true"
+  VITE_API_URL = "/.netlify/functions"
 
-# SPA yönlendirmesi için
-[[redirects]]
-  from = "/*"
-  to = "/index.html"
-  status = 200
+# Gerekli güvenlik başlıkları
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    X-XSS-Protection = "1; mode=block"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; font-src 'self' https: data:; img-src 'self' https: data:; connect-src 'self' https: ws: wss:;"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"

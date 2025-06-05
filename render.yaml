@@ -35,7 +35,7 @@ services:
       - key: REACT_APP_API_URL
         value: https://erp-hybrid-api.onrender.com
     autoDeploy: true
-    plan: starter
+    plan: free
     headers:
       - path: /*
         name: X-Frame-Options

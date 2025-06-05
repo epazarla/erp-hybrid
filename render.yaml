@@ -27,16 +27,14 @@ services:
     name: erp-hybrid-client
     env: static
     buildCommand: cd client && npm install && npm run build
-    staticPublishPath: "./client/build"
+    staticPublishPath: ./client/build
     envVars:
       - key: REACT_APP_API_URL
         value: https://erp-hybrid-api.onrender.com
     autoDeploy: true
-    region: frankfurt
     plan: starter
-    # Security Headers
+    region: frankfurt
     headers:
-      # Basic security headers for all paths
       - path: /*
         name: X-Frame-Options
         value: DENY

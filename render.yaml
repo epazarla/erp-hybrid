@@ -22,7 +22,7 @@ services:
     region: frankfurt
 
   # Frontend Static Site
-  - type: static_site
+  - type: web
     name: erp-hybrid-client
     env: static
     buildCommand: cd client && npm install && npm run build
@@ -31,6 +31,7 @@ services:
       - key: REACT_APP_API_URL
         value: https://erp-hybrid-api.onrender.com
     autoDeploy: true
+    plan: free
 
 databases:
   - name: erp-hybrid-db

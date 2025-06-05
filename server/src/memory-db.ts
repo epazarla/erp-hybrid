@@ -1,6 +1,6 @@
 // Veritabanı yerine geçici olarak kullanılacak bellek tabanlı veri saklama
 
-interface User {
+export interface User {
   id: number;
   email: string;
   password_hash: string;
@@ -9,7 +9,7 @@ interface User {
   created_at: string;
 }
 
-interface Task {
+export interface Task {
   id: number;
   title: string;
   description: string;
@@ -19,7 +19,7 @@ interface Task {
   created_at: string;
 }
 
-interface Client {
+export interface Client {
   id: number;
   name: string;
   contact_person: string;
@@ -39,13 +39,46 @@ interface Client {
   updated_at: string;
 }
 
-class MemoryDB {
+export class MemoryDB {
   private users: User[] = [];
   private tasks: Task[] = [];
   private clients: Client[] = [];
   private userIdCounter = 1;
   private taskIdCounter = 1;
   private clientIdCounter = 1;
+
+  // User methods
+  async getUsers(): Promise<User[]> {
+    return [...this.users];
+  }
+
+  async getUserById(id: number): Promise<User | undefined> {
+    return this.users.find(user => user.id === id);
+  }
+
+  async getUserByEmail(email: string): Promise<User | null> {
+    const user = this.users.find(user => user.email === email);
+    return user || null;
+  }
+
+  // Client methods
+  async getClients(): Promise<Client[]> {
+    return [...this.clients];
+  }
+
+  async getClientById(id: number): Promise<Client | null> {
+    const client = this.clients.find(client => client.id === id);
+    return client || null;
+  }
+
+  // Task methods
+  async getTasks(): Promise<Task[]> {
+    return [...this.tasks];
+  }
+
+  async getTaskById(id: number): Promise<Task | undefined> {
+    return this.tasks.find(task => task.id === id);
+  }
 
   // Kullanıcı işlemleri
   async createUser(email: string, password_hash: string, name: string, role: string): Promise<User> {
@@ -68,10 +101,7 @@ class MemoryDB {
     return newUser;
   }
 
-  async getUserByEmail(email: string): Promise<User | null> {
-    const user = this.users.find(user => user.email === email);
-    return user || null;
-  }
+
 
   // Görev işlemleri
   async createTask(title: string, description: string, assigned_to: number, due_date: string): Promise<Task> {
@@ -116,10 +146,7 @@ class MemoryDB {
     return this.clients;
   }
 
-  async getClientById(id: number): Promise<Client | null> {
-    const client = this.clients.find(client => client.id === id);
-    return client || null;
-  }
+
 
   async updateClient(id: number, clientData: Partial<Omit<Client, 'id' | 'created_at'>>): Promise<Client | null> {
     const index = this.clients.findIndex(client => client.id === id);

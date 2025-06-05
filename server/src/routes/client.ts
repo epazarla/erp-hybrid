@@ -1,5 +1,6 @@
-import express, { Request, Response } from 'express';
-import { Client } from '../models';
+import express from 'express';
+import { Request, Response } from 'express';
+import db from '../db';
 import memoryDB from '../memory-db';
 
 const router = express.Router();

@@ -1,7 +1,27 @@
-import { Router, Request, Response } from 'express';
+import express, { Request, Response, RequestHandler } from 'express';
 import db from '../db';
 
-const router = Router();
+interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+interface User {
+  id: number;
+  email: string;
+  name: string;
+  role: string;
+  department: string;
+  phone: string;
+  avatar_url: string;
+  status: string;
+  permissions: string;
+  last_login: Date;
+  created_at: Date;
+  updated_at: Date;
+}
+
+const router = express.Router();
 
 // Kullanıcıları getir
 router.get('/users', async (req: Request, res: Response) => {
@@ -69,12 +89,18 @@ router.get('/tasks', async (req: Request, res: Response) => {
   }
 });
 
+interface LoginRequest {
+  email: string;
+  password: string;
+}
+
 // Kullanıcı girişi
-router.post('/login', async (req: Request, res: Response) => {
+router.post('/login', async (req: Request<{}, {}, LoginRequest>, res: Response): Promise<void> => {
   const { email, password } = req.body;
   
   if (!email || !password) {
-    return res.status(400).json({ error: 'Email ve şifre gerekli' });
+    res.status(400).json({ error: 'Email ve şifre gerekli' });
+    return;
   }
   
   try {
@@ -103,12 +129,14 @@ router.post('/login', async (req: Request, res: Response) => {
     }
     
     if (!user) {
-      return res.status(401).json({ error: 'Geçersiz email veya şifre' });
+      res.status(401).json({ error: 'Geçersiz email veya şifre' });
+      return;
     }
     
     // Şifre kontrolü (gerçek uygulamada bcrypt kullanılmalı)
     if (user.password !== password) {
-      return res.status(401).json({ error: 'Geçersiz email veya şifre' });
+      res.status(401).json({ error: 'Geçersiz email veya şifre' });
+      return;
     }
     
     // Şifreyi yanıttan çıkar
@@ -130,10 +158,12 @@ router.post('/login', async (req: Request, res: Response) => {
       );
     }
     
-    return res.json(userWithoutPassword);
+    res.json(userWithoutPassword);
+    return;
   } catch (error) {
     console.error('Giriş yapılırken hata:', error);
-    return res.status(500).json({ error: 'Sunucu hatası' });
+    res.status(500).json({ error: 'Sunucu hatası' });
+    return;
   }
 });
 

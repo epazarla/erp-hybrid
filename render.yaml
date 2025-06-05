@@ -1,16 +1,41 @@
 services:
+  # Backend API Service
   - type: web
     name: erp-hybrid-api
     env: node
     buildCommand: cd server && npm install
-    startCommand: cd server && npm run dev
+    startCommand: cd server && npm start
     envVars:
       - key: NODE_ENV
-        value: development
+        value: production
       - key: PORT
         value: 10000
       - key: NPM_CONFIG_PRODUCTION
         value: "false"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: erp-hybrid-db
+          property: connectionString
+    plan: free
+    region: frankfurt
+
+  # Frontend Static Site
+  - type: web
+    name: erp-hybrid-client
+    env: static
+    buildCommand: cd client && npm install && npm run build
+    staticPublishPath: "./client/build"
+    envVars:
+      - key: REACT_APP_API_URL
+        value: https://erp-hybrid-api.onrender.com
     plan: free
     region: frankfurt
     autoDeploy: true
+
+databases:
+  - name: erp-hybrid-db
+    databaseName: erp_hybrid
+    user: erp_hybrid_user
+    plan: free

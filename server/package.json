@@ -6,9 +6,10 @@
   "scripts": {
     "dev": "ts-node-dev src/index.ts",
     "build": "tsc",
-    "start": "npm run dev",
+    "start": "node dist/index.js",
+    "postinstall": "npm run build",
     "render-build": "npm install",
-    "render-start": "npm run dev"
+    "render-start": "npm start"
   },
   "keywords": [],
   "author": "",
@@ -22,12 +23,15 @@
     "express": "^5.1.0",
     "mysql2": "^3.14.1",
     "pg": "^8.14.1",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.8.3"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.18",
     "@types/express": "^5.0.2",
+    "@types/jsonwebtoken": "^9.0.9",
     "@types/node": "^22.15.29"
   }
 }

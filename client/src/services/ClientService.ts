@@ -2,6 +2,9 @@
 import { v4 as uuidv4 } from 'uuid';
 
 // Müşteri arayüzü
+// Ödeme durumu tipi
+export type PaymentStatus = 'none' | 'partial' | 'paid' | 'overdue';
+
 export interface Client {
   id: string;
   name: string;
@@ -18,7 +21,7 @@ export interface Client {
   updatedAt: string;
   isActive: boolean;
   monthlyIncome?: number; // Aylık gelir miktarı
-  paymentStatus?: 'paid' | 'pending' | 'overdue' | 'none'; // Ödeme durumu
+  paymentStatus: PaymentStatus; // Ödeme durumu
   lastPaymentDate?: string; // Son ödeme tarihi
 }
 

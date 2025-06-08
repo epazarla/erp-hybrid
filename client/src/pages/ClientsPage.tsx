@@ -31,38 +31,46 @@ const a11yProps = (index: number) => ({
   id: `simple-tab-${index}`,
   'aria-controls': `simple-tabpanel-${index}`,
 });
-import { 
-  Box, 
-  Typography, 
-  Paper, 
-  Button, 
-  Grid, 
-  TextField, 
-  MenuItem, 
-  InputAdornment,
-  Chip,
+import {
+  Alert,
   Avatar,
+  Box,
+  Button,
+  Card,
+  CardContent,
+  Checkbox,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  FormControl,
+  FormControlLabel,
+  Grid,
+  IconButton,
+  InputAdornment,
+  InputLabel,
+  MenuItem,
+  Pagination,
+  Paper,
+  Select,
+  SelectChangeEvent,
+  Snackbar,
+  Switch,
+  Tab,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination as MuiTablePagination,
+  TablePaginationProps as MuiTablePaginationProps,
   TableRow,
-  TablePagination,
   Tabs,
-  Tab,
-  Snackbar,
-  Alert,
-  IconButton,
+  TextField,
   Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  FormControl,
-  InputLabel,
-  Select,
-  FormHelperText
+  Typography,
+  useTheme
 } from '@mui/material';
 import { 
   Add as AddIcon, 
@@ -86,27 +94,30 @@ import {
   Client, 
   SECTORS,
   CLIENTS_UPDATED_EVENT,
-  getAllClients,
-  addClient,
-  updateClient,
+  addClient, 
+  updateClient, 
   deleteClient,
+  PaymentStatus,
+  getAllClients,
   toggleClientStatus,
   createDemoClients,
   saveClientsToStorage
 } from '../services/ClientService';
 
+// Ödeme durumu için yardımcı fonksiyonlar
+
 // Tahsilat durumu etiketlerini getir
-const getPaymentStatusLabel = (status?: Client['paymentStatus']): string => {
+const getPaymentStatusLabel = (status: PaymentStatus = 'none'): string => {
   switch (status) {
     case 'paid':
       return 'Ödendi';
-    case 'pending':
-      return 'Beklemede';
+    case 'partial':
+      return 'Kısmi Ödeme';
     case 'overdue':
       return 'Gecikmiş';
     case 'none':
     default:
-      return 'Tanımlanmadı';
+      return 'Bekliyor';
   }
 };
 
@@ -115,7 +126,7 @@ const getPaymentStatusColor = (status?: Client['paymentStatus']): 'success' | 'w
   switch (status) {
     case 'paid':
       return 'success';
-    case 'pending':
+    case 'partial':
       return 'warning';
     case 'overdue':
       return 'error';
@@ -130,7 +141,7 @@ const getPaymentStatusIcon = (status?: Client['paymentStatus']): ReactElement | 
   switch (status) {
     case 'paid':
       return <CheckCircleIcon fontSize="small" />;
-    case 'pending':
+    case 'partial':
       return <HourglassEmptyIcon fontSize="small" />;
     case 'overdue':
       return <PriorityHighIcon fontSize="small" />;
@@ -142,7 +153,6 @@ const getPaymentStatusIcon = (status?: Client['paymentStatus']): ReactElement | 
 
 const ClientsPage: React.FC = () => {
   // State tanımlamaları
-  const [currentClient, setCurrentClient] = useState<Partial<Client> | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -155,7 +165,24 @@ const ClientsPage: React.FC = () => {
   const [clientToDelete, setClientToDelete] = useState<string>('');
   const [paymentDialogOpen, setPaymentDialogOpen] = useState<boolean>(false);
   const [clientToUpdate, setClientToUpdate] = useState<string>('');
-  const [newPaymentStatus, setNewPaymentStatus] = useState<string>('');
+  const [newPaymentStatus, setNewPaymentStatus] = useState<PaymentStatus>('none' as PaymentStatus);
+  const [addDialogOpen, setAddDialogOpen] = useState<boolean>(false);
+  const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
+  const [currentClient, setCurrentClient] = useState<Client | null>(null);
+  const [newClient, setNewClient] = useState<Omit<Client, 'id' | 'createdAt' | 'updatedAt'>>({
+    name: '',
+    contactPerson: '',
+    email: '',
+    phone: '',
+    address: '',
+    sector: 'Diğer',
+    taxNumber: '',
+    website: '',
+    notes: '',
+    isActive: true,
+    monthlyIncome: 0,
+    paymentStatus: 'none' as PaymentStatus
+  });
   const [snackbar, setSnackbar] = useState<{ 
     open: boolean; 
     message: string; 
@@ -264,16 +291,32 @@ const ClientsPage: React.FC = () => {
     setPage(0); // Filtre değiştiğinde ilk sayfaya dön
   };
 
-  // Sayfa değişimi
+  // Sayfalama işlevleri
   const handleChangePage = (event: unknown, newPage: number) => {
     setPage(newPage);
   };
 
-  // Sayfa başına satır sayısı değişimi
   const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
     setRowsPerPage(parseInt(event.target.value, 10));
     setPage(0);
   };
+
+  // Type-safe TablePagination component
+  const TablePagination = (props: MuiTablePaginationProps) => (
+    <MuiTablePagination
+      component="div"
+      {...props}
+      rowsPerPageOptions={[5, 10, 25, { label: 'All', value: -1 }]}
+      count={filteredClients.length}
+      rowsPerPage={rowsPerPage}
+      page={page}
+      onPageChange={handleChangePage}
+      onRowsPerPageChange={handleChangeRowsPerPage}
+      labelDisplayedRows={({ from, to, count }) => 
+        `${from}-${to} / ${count !== -1 ? count : `more than ${to}`}`
+      }
+    />
+  );
 
   // Tab değişimi
   const handleChangeTab = (event: React.SyntheticEvent, newValue: number) => {
@@ -357,6 +400,50 @@ const ClientsPage: React.FC = () => {
     setClientToDelete('');
   };
 
+  // Müşteri durumunu değiştir (aktif/pasif)
+  const handleToggleStatus = (clientId: string, currentStatus: boolean) => {
+    try {
+      // Müşteriyi bul
+      const clientToUpdate = clients.find(client => client.id === clientId);
+      if (!clientToUpdate) {
+        throw new Error('Müşteri bulunamadı');
+      }
+
+      // Müşteri durumunu güncelle
+      const updatedClient = {
+        ...clientToUpdate,
+        isActive: !currentStatus,
+        updatedAt: new Date().toISOString()
+      };
+
+      // Müşteriyi güncelle
+      const result = updateClient(updatedClient);
+      
+      if (result) {
+        // Müşteri listesini güncelle
+        setClients(prevClients => 
+          prevClients.map(client => 
+            client.id === clientId ? updatedClient : client
+          )
+        );
+        
+        // Başarı mesajını göster
+        setSnackbar({
+          open: true,
+          message: `Müşteri başarıyla ${!currentStatus ? 'aktif' : 'pasif'} duruma getirildi.`,
+          severity: 'success' as const
+        });
+      }
+    } catch (error) {
+      console.error('Müşteri durumu değiştirilirken hata oluştu:', error);
+      setSnackbar({
+        open: true,
+        message: 'Müşteri durumu değiştirilirken bir hata oluştu. Lütfen tekrar deneyin.',
+        severity: 'error' as const
+      });
+    }
+  };
+
   // Tahsilat durumu dialogunu aç
   const handleUpdatePaymentStatus = (clientId: string) => {
     const client = clients.find(c => c.id === clientId);
@@ -377,7 +464,7 @@ const ClientsPage: React.FC = () => {
           // Müşteri bilgilerini güncelle
           const updatedClient = {
             ...clients[clientIndex],
-            paymentStatus: newPaymentStatus as 'paid' | 'pending' | 'overdue' | 'none',
+            paymentStatus: newPaymentStatus as PaymentStatus,
             lastPaymentDate: newPaymentStatus === 'paid' ? new Date().toISOString() : clients[clientIndex].lastPaymentDate,
             updatedAt: new Date().toISOString()
           };
@@ -392,13 +479,13 @@ const ClientsPage: React.FC = () => {
             setSnackbar({
               open: true,
               message: 'Tahsilat durumu başarıyla güncellendi.',
-              severity: 'success'
+              severity: 'success' as const
             });
           } else {
             setSnackbar({
               open: true,
               message: 'Tahsilat durumu güncellenirken bir hata oluştu.',
-              severity: 'error'
+              severity: 'error' as const
             });
           }
         }
@@ -407,7 +494,7 @@ const ClientsPage: React.FC = () => {
         setSnackbar({
           open: true,
           message: 'Tahsilat durumu güncellenirken bir hata oluştu.',
-          severity: 'error'
+          severity: 'error' as const
         });
       }
     }
@@ -415,14 +502,174 @@ const ClientsPage: React.FC = () => {
     // Dialog'u kapat ve geçici state'i temizle
     setPaymentDialogOpen(false);
     setClientToUpdate('');
-    setNewPaymentStatus('');
+    setNewPaymentStatus('none');
   };
 
   // Tahsilat durumu güncelleme işlemini iptal et
   const cancelUpdatePaymentStatus = () => {
     setPaymentDialogOpen(false);
     setClientToUpdate('');
-    setNewPaymentStatus('');
+    setNewPaymentStatus('none');
+  };
+
+  // Yeni müşteri ekleme işlemi
+  const handleAddClient = async () => {
+    if (!newClient) return;
+
+    try {
+      // Zorunlu alanları kontrol et
+      if (!newClient.name.trim() || !newClient.email.trim()) {
+        setSnackbar({
+          open: true,
+          message: 'Lütfen zorunlu alanları doldurunuz.',
+          severity: 'error' as const
+        });
+        return;
+      }
+
+      // Geçerli bir PaymentStatus değeri belirle
+      const validPaymentStatus: PaymentStatus = (
+        newClient.paymentStatus === 'paid' || 
+        newClient.paymentStatus === 'partial' || 
+        newClient.paymentStatus === 'overdue' ||
+        newClient.paymentStatus === 'none'
+      ) ? newClient.paymentStatus : 'none';
+
+      const clientToAdd = {
+        ...newClient,
+        name: newClient.name.trim(),
+        email: newClient.email.trim(),
+        phone: newClient.phone.trim(),
+        address: newClient.address.trim(),
+        sector: newClient.sector.trim(),
+        contactPerson: newClient.contactPerson.trim(),
+        taxNumber: newClient.taxNumber?.trim() || '',
+        website: newClient.website?.trim() || '',
+        notes: newClient.notes?.trim() || '',
+        isActive: newClient.isActive,
+        paymentStatus: validPaymentStatus,
+        monthlyIncome: Number(newClient.monthlyIncome) || 0,
+        lastPaymentDate: newClient.lastPaymentDate || '',
+      };
+
+      const addedClient = await addClient(clientToAdd);
+
+      if (addedClient) {
+        // Müşteri listesini güncelle
+        setClients(prevClients => [...prevClients, addedClient]);
+        
+        // Formu sıfırla ve dialogu kapat
+        setNewClient({
+          name: '',
+          email: '',
+          phone: '',
+          address: '',
+          sector: 'Diğer',
+          contactPerson: '',
+          taxNumber: '',
+          website: '',
+          notes: '',
+          isActive: true,
+          paymentStatus: 'none',
+          monthlyIncome: 0,
+          lastPaymentDate: ''
+        });
+        setAddDialogOpen(false);
+        
+        // Başarılı mesajı göster
+        setSnackbar({
+          open: true,
+          message: 'Müşteri başarıyla eklendi.',
+          severity: 'success' as const
+        });
+      }
+    } catch (error) {
+      console.error('Müşteri eklenirken hata oluştu:', error);
+      setSnackbar({
+        open: true,
+        message: 'Müşteri eklenirken bir hata oluştu. Lütfen tekrar deneyin.',
+        severity: 'error' as const
+      });
+    }
+  };
+
+  // Müşteri düzenleme işlemi
+  const handleEditClient = (client: Client) => {
+    setCurrentClient(client);
+    setEditDialogOpen(true);
+  };
+
+    // Müşteri güncelleme işlevi
+  const handleUpdateClient = async () => {
+    if (!currentClient) return;
+
+    try {
+      // Ensure paymentStatus is a valid PaymentStatus value
+      const validPaymentStatus: PaymentStatus = 
+        (currentClient.paymentStatus === 'paid' || 
+         currentClient.paymentStatus === 'partial' || 
+         currentClient.paymentStatus === 'overdue') 
+          ? currentClient.paymentStatus 
+          : 'none';
+
+      const clientToUpdate: Client = {
+        ...currentClient,
+        paymentStatus: validPaymentStatus,
+        updatedAt: new Date().toISOString(),
+        // Ensure required fields are present
+        name: currentClient.name || '',
+        contactPerson: currentClient.contactPerson || '',
+        email: currentClient.email || '',
+        phone: currentClient.phone || '',
+        address: currentClient.address || '',
+        sector: currentClient.sector || 'Diğer',
+        isActive: currentClient.isActive !== undefined ? currentClient.isActive : true,
+        createdAt: currentClient.createdAt || new Date().toISOString()
+      };
+
+      const updatedClient = await updateClient(clientToUpdate);
+
+      if (updatedClient) {
+        // Müşterileri güncelle
+        setClients(prevClients => 
+          prevClients.map(c => c.id === updatedClient.id ? updatedClient : c)
+        );
+        
+        // Başarılı mesajı göster
+        setSnackbar({
+          open: true,
+          message: 'Müşteri başarıyla güncellendi.',
+          severity: 'success' as const
+        });
+        
+        // Formu kapat ve temizle
+        setEditDialogOpen(false);
+        setCurrentClient(null);
+      } else {
+        // Hata mesajı göster
+        setSnackbar({
+          open: true,
+          message: 'Müşteri güncellenirken bir hata oluştu. Lütfen bilgileri kontrol edin.',
+          severity: 'error' as const
+        });
+      }
+    } catch (error) {
+      console.error('Müşteri güncellenirken hata oluştu:', error);
+      setSnackbar({
+        open: true,
+        message: 'Müşteri güncellenirken bir hata oluştu. Lütfen tekrar deneyin.',
+        severity: 'error'
+      });
+    }
+  };
+
+  // Müşteri ekleme formu değişikliklerini işle
+  const handleNewClientChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+    const { name, value } = e.target;
+    setNewClient(prev => ({
+      ...prev,
+      [name as string]: value
+    }));
   };
 
   // Snackbar kapat
@@ -456,6 +703,7 @@ const ClientsPage: React.FC = () => {
           variant="contained" 
           color="primary" 
           startIcon={<AddIcon />}
+          onClick={() => setAddDialogOpen(true)}
         >
           Yeni Müşteri Ekle
         </Button>
@@ -585,7 +833,11 @@ const ClientsPage: React.FC = () => {
                       <TableCell align="right">
                         <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                           <Tooltip title="Müşteri Bilgilerini Düzenle">
-                            <IconButton size="small" color="primary">
+                            <IconButton 
+                              size="small" 
+                              color="primary"
+                              onClick={() => handleEditClient(client)}
+                            >
                               <EditIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
@@ -598,11 +850,29 @@ const ClientsPage: React.FC = () => {
                               <PaymentIcon fontSize="small" />
                             </IconButton>
                           </Tooltip>
+                          <Tooltip title={client.isActive ? 'Müşteriyi Pasife Al' : 'Müşteriyi Aktif Yap'}>
+                            <IconButton 
+                              size="small" 
+                              color={client.isActive ? 'warning' : 'success'}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleToggleStatus(client.id, client.isActive);
+                              }}
+                            >
+                              {client.isActive ? 
+                                <BlockIcon fontSize="small" /> : 
+                                <CheckCircleIcon fontSize="small" />
+                              }
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Müşteriyi Sil">
                             <IconButton 
                               size="small" 
                               color="error"
-                              onClick={() => handleDeleteClient(client.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteClient(client.id);
+                              }}
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
@@ -683,7 +953,7 @@ const ClientsPage: React.FC = () => {
               id="payment-status-select"
               value={newPaymentStatus}
               label="Tahsilat Durumu"
-              onChange={(e) => setNewPaymentStatus(e.target.value)}
+              onChange={(e) => setNewPaymentStatus(e.target.value as PaymentStatus)}
             >
               <MenuItem value="paid">
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
@@ -718,6 +988,332 @@ const ClientsPage: React.FC = () => {
           </Button>
           <Button onClick={confirmUpdatePaymentStatus} color="primary" variant="contained" autoFocus>
             Güncelle
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Yeni Müşteri Ekleme Dialogu */}
+      <Dialog 
+        open={addDialogOpen} 
+        onClose={() => setAddDialogOpen(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Yeni Müşteri Ekle</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Müşteri Adı *"
+                name="name"
+                value={newClient.name}
+                onChange={handleNewClientChange}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Yetkili Kişi"
+                name="contactPerson"
+                value={newClient.contactPerson}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="E-posta *"
+                name="email"
+                type="email"
+                value={newClient.email}
+                onChange={handleNewClientChange}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Telefon"
+                name="phone"
+                value={newClient.phone}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Adres"
+                name="address"
+                value={newClient.address}
+                onChange={handleNewClientChange}
+                margin="normal"
+                multiline
+                rows={2}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                select
+                fullWidth
+                label="Sektör"
+                name="sector"
+                value={newClient.sector}
+                onChange={handleNewClientChange}
+                margin="normal"
+              >
+                {SECTORS.map((sector) => (
+                  <MenuItem key={sector} value={sector}>
+                    {sector}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Vergi Numarası"
+                name="taxNumber"
+                value={newClient.taxNumber}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Web Sitesi"
+                name="website"
+                value={newClient.website}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Aylık Gelir (TL)"
+                name="monthlyIncome"
+                type="number"
+                value={newClient.monthlyIncome}
+                onChange={handleNewClientChange}
+                margin="normal"
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">₺</InputAdornment>,
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Notlar"
+                name="notes"
+                value={newClient.notes}
+                onChange={handleNewClientChange}
+                margin="normal"
+                multiline
+                rows={3}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={newClient.isActive}
+                    onChange={(e) => setNewClient({ ...newClient, isActive: e.target.checked })}
+                    name="isActive"
+                    color="primary"
+                  />
+                }
+                label={newClient.isActive ? 'Aktif Müşteri' : 'Pasif Müşteri'}
+              />
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAddDialogOpen(false)} color="inherit">
+            İptal
+          </Button>
+          <Button 
+            onClick={handleAddClient} 
+            color="primary" 
+            variant="contained"
+            disabled={!newClient.name || !newClient.email}
+          >
+            Müşteri Ekle
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Müşteri Düzenleme Diyaloğu */}
+      <Dialog open={editDialogOpen} onClose={() => setEditDialogOpen(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Müşteri Bilgilerini Düzenle</DialogTitle>
+        <DialogContent>
+          <Grid container spacing={2} sx={{ mt: 1 }}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Müşteri Adı *"
+                name="name"
+                value={newClient.name}
+                onChange={handleNewClientChange}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Yetkili Kişi"
+                name="contactPerson"
+                value={newClient.contactPerson}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="E-posta *"
+                name="email"
+                type="email"
+                value={newClient.email}
+                onChange={handleNewClientChange}
+                margin="normal"
+                required
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Telefon"
+                name="phone"
+                value={newClient.phone}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Adres"
+                name="address"
+                value={newClient.address}
+                onChange={handleNewClientChange}
+                margin="normal"
+                multiline
+                rows={2}
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                select
+                fullWidth
+                label="Sektör"
+                name="sector"
+                value={newClient.sector}
+                onChange={handleNewClientChange}
+                margin="normal"
+              >
+                {SECTORS.map((sector) => (
+                  <MenuItem key={sector} value={sector}>
+                    {sector}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Vergi Numarası"
+                name="taxNumber"
+                value={newClient.taxNumber}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Web Sitesi"
+                name="website"
+                value={newClient.website}
+                onChange={handleNewClientChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                label="Aylık Gelir (TL)"
+                name="monthlyIncome"
+                type="number"
+                value={newClient.monthlyIncome}
+                onChange={handleNewClientChange}
+                margin="normal"
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">₺</InputAdornment>,
+                }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                label="Notlar"
+                name="notes"
+                value={newClient.notes}
+                onChange={handleNewClientChange}
+                margin="normal"
+                multiline
+                rows={3}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={newClient.isActive}
+                    onChange={(e) => setNewClient({ ...newClient, isActive: e.target.checked })}
+                    name="isActive"
+                    color="primary"
+                  />
+                }
+                label={newClient.isActive ? 'Aktif Müşteri' : 'Pasif Müşteri'}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <FormControl fullWidth margin="normal">
+                <InputLabel>Tahsilat Durumu</InputLabel>
+                <Select
+                  value={newClient.paymentStatus}
+                  onChange={(e) => setNewClient({ ...newClient, paymentStatus: e.target.value as PaymentStatus })}
+                  label="Tahsilat Durumu"
+                >
+                  <MenuItem value="none">Beklemede</MenuItem>
+                  <MenuItem value="partial">Kısmi Ödendi</MenuItem>
+                  <MenuItem value="paid">Ödendi</MenuItem>
+                  <MenuItem value="overdue">Gecikmiş</MenuItem>
+                </Select>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setEditDialogOpen(false)} color="inherit">
+            İptal
+          </Button>
+          <Button 
+            onClick={handleUpdateClient} 
+            color="primary" 
+            variant="contained"
+            disabled={!newClient.name || !newClient.email}
+          >
+            Değişiklikleri Kaydet
           </Button>
         </DialogActions>
       </Dialog>

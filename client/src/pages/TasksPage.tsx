@@ -225,7 +225,7 @@ const TasksPage: React.FC = () => {
     title: '', 
     description: '', 
     assigned_to: 0, 
-    status: 'Bekliyor', 
+    status: 'pending', 
     due_date: new Date().toISOString().split('T')[0], 
     priority: 'medium',
     category: '',
@@ -258,7 +258,15 @@ const TasksPage: React.FC = () => {
   useEffect(() => {
     loadTasks();
     loadUsers();
-    loadClients();
+    
+    // loadClients asenkron olduğu için async IIFE kullanıyoruz
+    (async () => {
+      try {
+        await loadClients();
+      } catch (error) {
+        console.error('Müşteriler yüklenirken hata:', error);
+      }
+    })();
     
     // Varsayılan olarak ilk kullanıcıyı mevcut kullanıcı olarak ayarla
     // Gerçek uygulamada bu, oturum açma sisteminden gelecektir
@@ -441,13 +449,15 @@ const TasksPage: React.FC = () => {
   };
 
   // Müşterileri yükle
-  const loadClients = () => {
+  const loadClients = async () => {
     try {
-      const clients = getAllClients(true); // Sadece aktif müşterileri getir
+      const clients = await getAllClients(true); // Sadece aktif müşterileri getir
       setActiveClients(clients);
       console.log(`Görev sayfası için ${clients.length} aktif müşteri yüklendi`);
     } catch (error) {
       console.error('Müşteriler yüklenirken hata oluştu:', error);
+      // Hata durumunda boş dizi atayalım ki map hatası oluşmasın
+      setActiveClients([]);
     }
   };
   

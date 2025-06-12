@@ -99,7 +99,6 @@ import {
   TASK_STATUS_LABELS,
   TASK_PRIORITIES,
   TASKS_UPDATED_EVENT,
-  updateTaskCompletionStats,
   TASK_COMPLETION_UPDATE_EVENT,
   UPCOMING_TASKS_UPDATE_EVENT
 } from '../services/TaskService';
@@ -111,67 +110,120 @@ import { Client, getAllClients, CLIENTS_UPDATED_EVENT } from '../services/Client
  * 
  * Bu sayfa görev yönetim sisteminin giriş noktasıdır.
  */
-// Yardımcı fonksiyonlar
-// Görev durumuna göre renk döndür
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case 'pending': return '#FFA000'; // Amber
-    case 'in_progress': return '#1976D2'; // Mavi
-    case 'completed': return '#43A047'; // Yeşil
-    case 'cancelled': return '#E53935'; // Kırmızı
-    case 'on_hold': return '#757575'; // Gri
-    default: return '#757575'; // Gri
-  }
-};
-
-// Görev bitiş tarihine göre kalan gün sayısını döndür
-const getRemainingDays = (dueDate: string): string => {
-  const today = new Date();
-  const due = new Date(dueDate);
-  today.setHours(0, 0, 0, 0);
-  due.setHours(0, 0, 0, 0);
-  
-  const diffTime = due.getTime() - today.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays < 0) {
-    return `${Math.abs(diffDays)} gün gecikti`;
-  } else if (diffDays === 0) {
-    return 'Bugün';
-  } else {
-    return `${diffDays} gün kaldı`;
-  }
-};
-
-const TasksPage: React.FC = () => {
-  // State tanımlamaları
+const TasksPage: React.FC = (): React.ReactNode => {
+  // Temel state tanımlamaları
   const [tasks, setTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [clients, setClients] = useState<Client[]>([]);
+  const [activeClients, setActiveClients] = useState<Client[]>([]);
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [filter, setFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  
+  // Mevcut kullanıcı
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  
+  // Kullanıcı ve filtreleme için state'ler
   const [usersByDepartment, setUsersByDepartment] = useState<Record<string, User[]>>({});
   const [filterStatus, setFilterStatus] = useState('all');
   const [filterAssignee, setFilterAssignee] = useState(0);
   const [filterClient, setFilterClient] = useState('');
   const [showMyTasks, setShowMyTasks] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [activeClients, setActiveClients] = useState<Client[]>([]);
-  const [categories, setCategories] = useState<string[]>([]);
   const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   
+  // Görev istatistikleri için state'ler
+  const [tasksByStatus, setTasksByStatus] = useState<Record<string, number>>({});
+  const [taskCompletionRate, setTaskCompletionRate] = useState<number>(0);
+  
+  // Bildirim için snackbar state'i
+  const [snackbar, setSnackbar] = useState<{open: boolean, message: string, severity: 'success' | 'error' | 'info'}>({ 
+    open: false, 
+    message: '', 
+    severity: 'info' 
+  });
+  
+  // Görev düzenleme için state'ler
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [editDialogOpen, setEditDialogOpen] = useState<boolean>(false);
+  
+  // Yeni görev ekleme için state
+  const [newTask, setNewTask] = useState<Task>({
+    id: 0, // Temporary ID, will be assigned by backend
+    title: '', 
+    description: '', 
+    assigned_to: 0, 
+    status: 'pending', 
+    due_date: new Date().toISOString().split('T')[0],
+    created_at: new Date().toISOString(), // Required field
+    priority: 'medium',
+    category: '',
+    client_id: ''
+  });
+  
+  // Silinen görev için state
+  const [deletedTaskId, setDeletedTaskId] = useState<number | null>(null);
+  
+  // Kategori yönetimi için state'ler
+  const [newCategory, setNewCategory] = useState<string>('');
+  const [openCategoryDialog, setOpenCategoryDialog] = useState<boolean>(false);
+  
+  // Dialog açma/kapama state'i
+  const [openDialog, setOpenDialog] = useState<boolean>(false);
+  
+  // Görev listesi görünüm tipi için state
+  const [viewType, setViewType] = useState<'cards' | 'list'>('cards');
+  
+  // Durum menüsü için state
+  const [statusMenuAnchor, setStatusMenuAnchor] = useState<null | HTMLElement>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
+
+  // Görev durumuna göre renk döndür
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case 'pending': return '#FFA000'; // Amber
+      case 'in-progress': return '#1976D2'; // Mavi
+      case 'completed': return '#43A047'; // Yeşil
+      case 'cancelled': return '#E53935'; // Kırmızı
+      case 'on-hold': return '#757575'; // Gri
+      default: return '#757575'; // Gri
+    }
+  };
+
+  // Görev bitiş tarihine göre kalan gün sayısını döndür
+  const getRemainingDays = (dueDate: string): string => {
+    const today = new Date();
+    const due = new Date(dueDate);
+    today.setHours(0, 0, 0, 0);
+    due.setHours(0, 0, 0, 0);
+    
+    const diffTime = due.getTime() - today.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return `${Math.abs(diffDays)} gün gecikti`;
+    } else if (diffDays === 0) {
+      return 'Bugün';
+    } else {
+      return `${diffDays} gün kaldı`;
+    }
+  };
+
   // Görev tamamlama istatistiklerini ve yakın görevleri güncelle ve dashboard'a ilet
-  const updateTaskCompletionStats = (source: string, tasksData?: Task[]) => {
+  const updateTaskCompletionStats = async (source: string, tasksData?: Task[]) => {
     console.log(`Görev istatistikleri güncelleniyor (${source})...`);
-    const allTasks = tasksData || getAllTasks();
+    const allTasks = tasksData || await getAllTasks();
     
     if (allTasks.length > 0) {
-      const completedTasksCount = allTasks.filter(task => task.status === 'completed').length;
+      const completedTasksCount = allTasks.filter((task: Task) => task.status === 'completed').length;
       const completionRate = Math.round((completedTasksCount / allTasks.length) * 100);
       
       // Görev durumlarına göre sayıları hesapla
       const statusCounts: Record<string, number> = {};
       TASK_STATUSES.forEach(status => {
-        statusCounts[status] = allTasks.filter(task => task.status === status).length;
+        statusCounts[status] = allTasks.filter((task: Task) => task.status === status).length;
       });
       
       // Görev tamamlama bildirimini gönder
@@ -194,13 +246,13 @@ const TasksPage: React.FC = () => {
       nextWeek.setDate(today.getDate() + 7);
       
       const upcomingTasksList = allTasks
-        .filter(task => {
+        .filter((task: Task) => {
           const dueDate = new Date(task.due_date);
           dueDate.setHours(0, 0, 0, 0);
           return dueDate >= today && dueDate <= nextWeek && 
                 task.status !== 'completed' && task.status !== 'cancelled';
         })
-        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+        .sort((a: Task, b: Task) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
       
       // Yakın görevler bildirimini gönder
       const upcomingEvent = new CustomEvent(UPCOMING_TASKS_UPDATE_EVENT, {
@@ -219,44 +271,18 @@ const TasksPage: React.FC = () => {
       console.log(`Görev istatistikleri dashboard'a iletildi: Tamamlanma: %${completionRate}, Yakın görevler: ${upcomingTasksList.length}`);
     }
   };
-  const [taskCompletionRate, setTaskCompletionRate] = useState<number>(0);
-  const [tasksByStatus, setTasksByStatus] = useState<Record<string, number>>({});
-  const [newTask, setNewTask] = useState<Omit<Task, 'id' | 'created_at'>>({ 
-    title: '', 
-    description: '', 
-    assigned_to: 0, 
-    status: 'pending', 
-    due_date: new Date().toISOString().split('T')[0], 
-    priority: 'medium',
-    category: '',
-    client_id: ''
-  });
-  
-  // Görev düzenleme için state'ler
-  const [editTask, setEditTask] = useState<Task | null>(null);
-  const [editDialogOpen, setEditDialogOpen] = useState(false);
-  
-  // Proje kategorileri
-  const [snackbar, setSnackbar] = useState<{open: boolean, message: string, severity: 'success' | 'error' | 'info'}>({ 
-    open: false, 
-    message: '', 
-    severity: 'info' 
-  });
-  const [deletedTaskId, setDeletedTaskId] = useState<number | null>(null);
-  const [openDialog, setOpenDialog] = useState(false);
-  const [openCategoryDialog, setOpenCategoryDialog] = useState(false);
-  const [newCategory, setNewCategory] = useState('');
-  
-  // Görev listesi görünüm tipi için state
-  const [viewType, setViewType] = useState<'cards' | 'list'>('cards');
-  
-  // Durum menüsü için state
-  const [statusMenuAnchor, setStatusMenuAnchor] = useState<null | HTMLElement>(null);
-  const [selectedTaskId, setSelectedTaskId] = useState<number | null>(null);
 
   // Görevleri, kullanıcıları ve müşterileri yükle
   useEffect(() => {
-    loadTasks();
+    // loadTasks asenkron olduğu için async IIFE kullanıyoruz
+    (async () => {
+      try {
+        await loadTasks();
+      } catch (error) {
+        console.error('Görevler yüklenirken hata:', error);
+      }
+    })();
+    
     loadUsers();
     
     // loadClients asenkron olduğu için async IIFE kullanıyoruz
@@ -272,15 +298,23 @@ const TasksPage: React.FC = () => {
     // Gerçek uygulamada bu, oturum açma sisteminden gelecektir
     
     // Görev güncellemelerini dinle
-    const handleTasksUpdated = () => {
+    const handleTasksUpdated = async () => {
       console.log('Görevler güncellendi, yeniden yükleniyor...');
-      loadTasks();
+      await loadTasks();
     };
     
     // Müşteri güncellemelerini dinle
-    const handleClientsUpdated = () => {
+    const handleClientsUpdated = (event: Event) => {
       console.log('Müşteriler güncellendi, yeniden yükleniyor...');
-      loadClients();
+      const customEvent = event as CustomEvent;
+      // Eğer event içinde güncel müşteri listesi varsa, doğrudan kullan
+      if (customEvent.detail?.clients && Array.isArray(customEvent.detail.clients)) {
+        setActiveClients(customEvent.detail.clients.filter((client: Client) => client.is_active));
+        console.log(`Görev sayfası için ${customEvent.detail.clients.filter((client: Client) => client.is_active).length} aktif müşteri güncellendi`);
+      } else {
+        // Yoksa API'den yeniden yükle
+        loadClients();
+      }
     };
     
     // Kullanıcı güncellemelerini dinle
@@ -313,19 +347,19 @@ const TasksPage: React.FC = () => {
   }, []);
 
   // Görevleri yükle
-  const loadTasks = () => {
+  const loadTasks = async () => {
     try {
       console.log('Görevler yükleniyor...');
       
-      // Doğrudan localStorage'dan en güncel görevleri al
-      const allTasks = getAllTasks();
+      // Supabase'den en güncel görevleri al
+      const allTasks = await getAllTasks();
       console.log(`Yüklenen görev sayısı: ${allTasks.length}`);
       setTasks(allTasks);
       
       // Görev durumlarına göre sayıları hesapla
       const statusCounts: Record<string, number> = {};
       TASK_STATUSES.forEach(status => {
-        statusCounts[status] = allTasks.filter(task => task.status === status).length;
+        statusCounts[status] = allTasks.filter((task: Task) => task.status === status).length;
       });
       setTasksByStatus(statusCounts);
       console.log('Görev durumları sayıldı:', statusCounts);
@@ -338,20 +372,20 @@ const TasksPage: React.FC = () => {
       nextWeek.setDate(today.getDate() + 7);
       
       const upcomingTasksList = allTasks
-        .filter(task => {
+        .filter((task: Task) => {
           const dueDate = new Date(task.due_date);
           dueDate.setHours(0, 0, 0, 0);
           return dueDate >= today && dueDate <= nextWeek && task.status !== 'completed' && task.status !== 'cancelled';
         })
-        .sort((a, b) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
+        .sort((a: Task, b: Task) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
       
       setUpcomingTasks(upcomingTasksList);
       console.log(`Yaklaşan görev sayısı: ${upcomingTasksList.length}`);
       
       // Tamamlanan görevleri filtrele
       const completedTasksList = allTasks
-        .filter(task => task.status === 'completed')
-        .sort((a, b) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime());
+        .filter((task: Task) => task.status === 'completed')
+        .sort((a: Task, b: Task) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime());
       
       setCompletedTasks(completedTasksList);
       console.log(`Tamamlanan görev sayısı: ${completedTasksList.length}`);
@@ -363,16 +397,16 @@ const TasksPage: React.FC = () => {
         console.log(`Görev tamamlanma oranı: %${completionRate}`);
         
         // Görev tamamlama verilerini dashboard'a ilet
-        updateTaskCompletionStats('tasks-page-load', allTasks);
-        console.log(`Görev tamamlama verileri dashboard'a iletildi.`);
+        await updateTaskCompletionStats('tasks-page-load', allTasks);
+        console.log(`Görev tamamlanma verileri dashboard'a iletildi.`);
       } else {
         setTaskCompletionRate(0);
       }
       
       // Kategorileri topla
-      const uniqueCategories2 = Array.from(new Set(allTasks.filter(task => task.category).map(task => task.category as string)));
-      setCategories(uniqueCategories2);
-      console.log(`Kategori sayısı: ${uniqueCategories2.length}`);
+      const uniqueCategories = Array.from(new Set(allTasks.filter((task: Task) => task.category).map((task: Task) => task.category as string)));
+      setCategories(uniqueCategories);
+      console.log(`Kategori sayısı: ${uniqueCategories.length}`);
       
       // Yeni görev için varsayılan değerleri ayarla
       if (currentUser) {
@@ -460,7 +494,7 @@ const TasksPage: React.FC = () => {
       setActiveClients([]);
     }
   };
-  
+
   // Kategori değiştiğinde
   const handleCategoryChange = (event: React.ChangeEvent<{ value: unknown }>) => {
     const value = event.target.value as string;
@@ -473,7 +507,7 @@ const TasksPage: React.FC = () => {
       setNewTask({...newTask, category: value});
     }
   };
-  
+
   // Yeni kategori ekle
   const handleAddCategory = () => {
     if (newCategory.trim() === '') {
@@ -514,7 +548,7 @@ const TasksPage: React.FC = () => {
   };
 
   // Yeni görev ekle
-  const handleAddTask = () => {
+  const handleAddTask = async () => {
     if (!newTask.title || !newTask.assigned_to || !newTask.due_date) {
       setSnackbar({
         open: true,
@@ -529,13 +563,13 @@ const TasksPage: React.FC = () => {
       let taskToAdd = { ...newTask };
       
       if (newTask.client_id && !newTask.category) {
-        const selectedClient = activeClients.find(client => client.id === newTask.client_id);
+        const selectedClient = activeClients.find((client: Client) => client.id === newTask.client_id);
         if (selectedClient) {
           taskToAdd.category = selectedClient.name;
         }
       }
       
-      const result = addTask(taskToAdd);
+      const result = await addTask(taskToAdd);
       
       if (result) {
         setSnackbar({
@@ -546,20 +580,23 @@ const TasksPage: React.FC = () => {
         
         // Formu sıfırla
         setNewTask({
+          id: 0,
           title: '',
           description: '',
-          status: 'pending', // Önemli: 'Bekliyor' yerine 'pending' kullanılıyor
-          priority: 'medium',
-          assigned_to: 0,
+          assigned_to: currentUser ? currentUser.id : 0,
+          status: 'pending',
           due_date: new Date().toISOString().split('T')[0],
-          category: '',
-          client_id: ''
+          created_at: new Date().toISOString(),
+          priority: 'medium',
+          client_id: '',
+          category: ''
         });
         
-        loadTasks();
+        // Görevleri yeniden yükle
+        await loadTasks();
         
-        // Görev tamamlama verilerini dashboard'a ilet
-        updateTaskCompletionStats('task-added');
+        // Dashboard'a görev istatistiklerini gönder
+        await updateTaskCompletionStats('task-add');
       } else {
         setSnackbar({
           open: true,
@@ -578,12 +615,12 @@ const TasksPage: React.FC = () => {
   };
 
   // Görev sil
-  const handleDeleteTask = (taskId: number) => {
+  const handleDeleteTask = async (taskId: number) => {
     try {
       console.log(`Görev siliniyor: ID=${taskId}`);
       
       // Önce görevi kontrol et
-      const task = getTaskById(taskId);
+      const task = await getTaskById(taskId);
       if (!task) {
         console.error(`Silinecek görev bulunamadı: ID=${taskId}`);
         setSnackbar({
@@ -595,20 +632,22 @@ const TasksPage: React.FC = () => {
       }
       
       // Görevi sil
-      const result = deleteTask(taskId);
+      const result = await deleteTask(taskId);
       
       if (result) {
         console.log(`Görev başarıyla silindi: ID=${taskId}`);
-        setDeletedTaskId(taskId);
+        
+        // Görevleri yeniden yükle
+        await loadTasks();
+        
+        // Dashboard'a görev istatistiklerini gönder
+        await updateTaskCompletionStats('task-delete');
         
         setSnackbar({
           open: true,
           message: 'Görev başarıyla silindi',
           severity: 'success'
         });
-        
-        // Görevleri yeniden yükle
-        loadTasks();
         
         // Görev güncellendi olayını manuel olarak tetikle
         window.dispatchEvent(new CustomEvent(TASKS_UPDATED_EVENT));
@@ -631,11 +670,11 @@ const TasksPage: React.FC = () => {
   };
 
   // Görevi geri al
-  const handleRestoreTask = () => {
+  const handleRestoreTask = async () => {
     if (!deletedTaskId) return;
     
     try {
-      const result = restoreTask(deletedTaskId);
+      const result = await restoreTask(deletedTaskId);
       if (result) {
         setSnackbar({
           open: true,
@@ -645,7 +684,10 @@ const TasksPage: React.FC = () => {
         setDeletedTaskId(null);
         
         // Görevleri yeniden yükle
-        loadTasks();
+        await loadTasks();
+        
+        // Dashboard'a görev istatistiklerini gönder
+        await updateTaskCompletionStats('task-restore');
       } else {
         setSnackbar({
           open: true,
@@ -662,14 +704,14 @@ const TasksPage: React.FC = () => {
       });
     }
   };
-  
+
   // Görev düzenleme işlemini başlat
-  const handleEditTask = (taskId: number) => {
+  const handleEditTask = async (taskId: number) => {
     try {
       console.log(`Görev düzenleniyor: ID=${taskId}`);
       
       // Görevi al
-      const task = getTaskById(taskId);
+      const task = await getTaskById(taskId);
       if (!task) {
         console.error(`Düzenlenecek görev bulunamadı: ID=${taskId}`);
         setSnackbar({
@@ -692,9 +734,9 @@ const TasksPage: React.FC = () => {
       });
     }
   };
-  
+
   // Düzenlenen görevi kaydet
-  const handleSaveEditedTask = () => {
+  const handleSaveEditedTask = async () => {
     try {
       if (!editTask) {
         console.error('Düzenlenecek görev bulunamadı');
@@ -704,7 +746,7 @@ const TasksPage: React.FC = () => {
       console.log(`Düzenlenen görev kaydediliyor: ID=${editTask.id}`);
       
       // Görevi güncelle
-      const result = updateTask(editTask.id, {
+      const result = await updateTask(editTask.id, {
         title: editTask.title,
         description: editTask.description,
         status: editTask.status,
@@ -729,10 +771,10 @@ const TasksPage: React.FC = () => {
         setEditTask(null);
         
         // Görevleri yeniden yükle
-        loadTasks();
+        await loadTasks();
         
-        // Görev tamamlama verilerini ve yaklaşan görevleri dashboard'a ilet
-        updateTaskCompletionStats('task-edited');
+        // Dashboard'a görev istatistiklerini gönder
+        await updateTaskCompletionStats('task-edit');
         
         // Görev güncellendi olayını manuel olarak tetikle
         window.dispatchEvent(new CustomEvent(TASKS_UPDATED_EVENT));
@@ -753,14 +795,14 @@ const TasksPage: React.FC = () => {
       });
     }
   };
-  
+
   // Görev durumunu değiştirme işlemi
-  const handleStatusChange = (taskId: number, newStatus: string) => {
+  const handleStatusChange = async (taskId: number, newStatus: string) => {
     try {
       console.log(`Görev durumu değiştiriliyor: ID=${taskId}, yeni durum=${newStatus}`);
       
       // Önce görevi al
-      const task = getTaskById(taskId);
+      const task = await getTaskById(taskId);
       if (!task) {
         console.error(`Görev bulunamadı: ID=${taskId}`);
         setSnackbar({
@@ -773,7 +815,7 @@ const TasksPage: React.FC = () => {
       }
       
       // Görev durumunu güncelle
-      const result = updateTask(taskId, { status: newStatus });
+      const result = await updateTask(taskId, { status: newStatus });
       
       if (result) {
         // Türkçe durum etiketini kullan
@@ -787,7 +829,10 @@ const TasksPage: React.FC = () => {
         });
         
         // Görevleri yeniden yükle
-        loadTasks();
+        await loadTasks();
+        
+        // Dashboard'a görev istatistiklerini gönder
+        await updateTaskCompletionStats('task-status-change');
         
         // Görev güncellendi olayını manuel olarak tetikle
         window.dispatchEvent(new CustomEvent(TASKS_UPDATED_EVENT));
@@ -856,7 +901,7 @@ const TasksPage: React.FC = () => {
       return true;
     });
   };
-  
+
   // Departman görevlerini göster/gizle
   const toggleMyTasks = () => {
     setShowMyTasks(!showMyTasks);
@@ -2065,7 +2110,6 @@ const TasksPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
-// ... 
     </Box>
   );
 };

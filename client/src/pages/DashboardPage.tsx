@@ -32,18 +32,25 @@ import { User, getActiveUsers } from '../services/UserService';
 import { Client, getAllClients } from '../services/ClientService';
 import { 
   Task, 
-  getAllTasks as getTasksFromService, 
+  getAllTasks,
+  getAllTasksAndNotify,
+  TASK_STATUS_LABELS,
+  TASK_STATUSES as SERVICE_TASK_STATUSES, 
   TASKS_UPDATED_EVENT,
-  TASK_STATUS_LABELS
+  TASK_COMPLETION_UPDATE_EVENT, 
+  UPCOMING_TASKS_UPDATE_EVENT,
+  RECENT_TASKS_UPDATE_EVENT,
+  TASK_STATUS_UPDATE_EVENT,
+  TASK_WIDGET_UPDATE_EVENT
 } from '../services/TaskService';
 
 // Görev durumları için sabitler
 const TASK_STATUSES = {
   COMPLETED: 'completed',
-  IN_PROGRESS: 'in_progress',
   PENDING: 'pending',
-  ON_HOLD: 'on_hold',
-  CANCELLED: 'cancelled'
+  IN_PROGRESS: 'in-progress',
+  CANCELLED: 'cancelled',
+  ON_HOLD: 'on-hold'
 };
 
 // Yardımcı sabitler - Kullanıcı avatarları için sabit URL'ler
@@ -73,6 +80,19 @@ export default function DashboardPage() {
   const [pendingTasks, setPendingTasks] = useState<Task[]>([]);
   const [overdueTasks, setOverdueTasks] = useState<Task[]>([]);
   const [taskCompletionRate, setTaskCompletionRate] = useState<number>(0);
+  
+  // Canlı görev güncellemeleri için state
+  const [taskStats, setTaskStats] = useState<{
+    completionRate: number;
+    counts: Record<string, number>;
+    totalTasks: number;
+    completedTasks: number;
+    timestamp: string;
+  } | null>(null);
+  
+  // Yaklaşan görevler için state
+  const [upcomingTasks, setUpcomingTasks] = useState<Task[]>([]);
+  const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   // Veri yükleme fonksiyonu
   useEffect(() => {
@@ -82,23 +102,23 @@ export default function DashboardPage() {
         setError(null);
 
         // Görevleri yükle
-        const allTasks = getTasksFromService();
+        const allTasks = await getAllTasks();
         setTasks(allTasks);
 
         // Tamamlanma oranını hesapla
         if (allTasks.length > 0) {
-          const completedCount = allTasks.filter(task => task.status === TASK_STATUSES.COMPLETED).length;
+          const completedCount = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED).length;
           const rate = Math.round((completedCount / allTasks.length) * 100);
           setTaskCompletionRate(rate);
         }
 
         // Görev durumlarına göre ayır
-        const completed = allTasks.filter(task => task.status === TASK_STATUSES.COMPLETED);
-        const pending = allTasks.filter(task => 
+        const completed = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED);
+        const pending = allTasks.filter((task: Task) => 
           task.status === TASK_STATUSES.IN_PROGRESS || 
           task.status === TASK_STATUSES.PENDING
         );
-        const overdue = allTasks.filter(task => {
+        const overdue = allTasks.filter((task: Task) => {
           if (!task.due_date) return false;
           const dueDate = parseISO(task.due_date);
           const today = new Date();
@@ -114,7 +134,7 @@ export default function DashboardPage() {
         setActiveUsers(users);
 
         // Müşterileri yükle
-        const allClients = getAllClients();
+        const allClients = await getAllClients();
         setClients(allClients);
 
         setLoading(false);
@@ -131,12 +151,124 @@ export default function DashboardPage() {
     const handleTasksUpdated = () => {
       loadData();
     };
+    
+    // Görev tamamlama istatistiklerini dinle
+    const handleTaskCompletionUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const stats = customEvent.detail;
+      console.log('Dashboard: Görev tamamlama istatistikleri güncellendi', stats);
+      setTaskStats(stats);
+      setLastUpdate(new Date());
+      
+      // İstatistiklere göre görev durumlarını güncelle
+      if (stats && stats.completionRate !== undefined) {
+        setTaskCompletionRate(stats.completionRate);
+      }
+    };
+    
+    // Yaklaşan görevleri dinle
+    const handleUpcomingTasksUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const upcomingTasksData = customEvent.detail?.tasks;
+      console.log('Dashboard: Yaklaşan görevler güncellendi', upcomingTasksData);
+      if (upcomingTasksData && Array.isArray(upcomingTasksData)) {
+        setUpcomingTasks(upcomingTasksData);
+        setLastUpdate(new Date());
+      }
+    };
+    
+    // Son görevleri dinle
+    const handleRecentTasksUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const recentTasksData = customEvent.detail?.tasks;
+      console.log('Dashboard: Son görevler güncellendi', recentTasksData);
+      if (recentTasksData && Array.isArray(recentTasksData)) {
+        setTasks(recentTasksData);
+        setLastUpdate(new Date());
+      }
+    };
+    
+    // Görev durumu güncellemelerini dinle
+    const handleTaskStatusUpdate = async (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const statusData = customEvent.detail;
+      console.log('Dashboard: Görev durumu güncellendi', statusData);
+      setLastUpdate(new Date());
+      
+      // Görev durumu güncellemesi sonrası gerekli verileri yenile
+      const allTasks = await getAllTasks();
+      setTasks(allTasks);
+        
+        // Görevleri durumlara göre filtrele
+        const completed = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED);
+        const pending = allTasks.filter((task: Task) => task.status === TASK_STATUSES.PENDING);
+        
+        // Gecikmiş görevleri hesapla
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const overdue = allTasks.filter((task: Task) => {
+          const dueDate = new Date(task.due_date);
+          dueDate.setHours(0, 0, 0, 0);
+          return differenceInDays(today, dueDate) > 0 && task.status !== TASK_STATUSES.COMPLETED;
+        });
+      
+      setCompletedTasks(completed);
+      setPendingTasks(pending);
+      setOverdueTasks(overdue);
+    };
+    
+    // Tüm widget'ları güncelleme olayını dinle
+    const handleTaskWidgetUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const widgetData = customEvent.detail;
+      console.log('Dashboard: Tüm widget verileri güncellendi', widgetData);
+      
+      if (widgetData) {
+        // Tüm widget verilerini güncelle
+        if (widgetData.completionRate !== undefined) {
+          setTaskCompletionRate(widgetData.completionRate);
+        }
+        
+        if (widgetData.statusCounts) {
+          setTaskStats({
+            completionRate: widgetData.completionRate || 0,
+            counts: widgetData.statusCounts,
+            totalTasks: widgetData.tasks?.length || 0,
+            completedTasks: widgetData.tasks?.filter((t: Task) => t.status === 'completed').length || 0,
+            timestamp: widgetData.timestamp
+          });
+        }
+        
+        if (widgetData.upcomingTasks && Array.isArray(widgetData.upcomingTasks)) {
+          setUpcomingTasks(widgetData.upcomingTasks);
+        }
+        
+        if (widgetData.recentTasks && Array.isArray(widgetData.recentTasks)) {
+          setTasks(widgetData.recentTasks);
+        }
+        
+        setLastUpdate(new Date());
+      }
+    };
 
     window.addEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
-
+    window.addEventListener(TASK_COMPLETION_UPDATE_EVENT, handleTaskCompletionUpdate);
+    window.addEventListener(UPCOMING_TASKS_UPDATE_EVENT, handleUpcomingTasksUpdate);
+    window.addEventListener(RECENT_TASKS_UPDATE_EVENT, handleRecentTasksUpdate);
+    window.addEventListener(TASK_STATUS_UPDATE_EVENT, handleTaskStatusUpdate);
+    window.addEventListener(TASK_WIDGET_UPDATE_EVENT, handleTaskWidgetUpdate);
+    
+    // Başlangıçta tüm görev verilerini ve olayları tetikle
+    getAllTasksAndNotify('dashboard-init');
+    
     // Cleanup
     return () => {
       window.removeEventListener(TASKS_UPDATED_EVENT, handleTasksUpdated);
+      window.removeEventListener(TASK_COMPLETION_UPDATE_EVENT, handleTaskCompletionUpdate);
+      window.removeEventListener(UPCOMING_TASKS_UPDATE_EVENT, handleUpcomingTasksUpdate);
+      window.removeEventListener(RECENT_TASKS_UPDATE_EVENT, handleRecentTasksUpdate);
+      window.removeEventListener(TASK_STATUS_UPDATE_EVENT, handleTaskStatusUpdate);
+      window.removeEventListener(TASK_WIDGET_UPDATE_EVENT, handleTaskWidgetUpdate);
     };
   }, []);
 
@@ -220,8 +352,13 @@ export default function DashboardPage() {
                 sx={{ height: 8, borderRadius: 5, mb: 1 }}
               />
               <Typography variant="body2" color="text.secondary">
-                Toplam {tasks.length} görevden {completedTasks.length} tamamlandı
+                Toplam {taskStats?.totalTasks || tasks.length} görevden {taskStats?.completedTasks || completedTasks.length} tamamlandı
               </Typography>
+              {lastUpdate && (
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1 }}>
+                  Son güncelleme: {format(lastUpdate, 'HH:mm:ss', { locale: tr })}
+                </Typography>
+              )}
             </CardContent>
           </Card>
         </Grid>
@@ -242,7 +379,7 @@ export default function DashboardPage() {
                   </ListItemAvatar>
                   <ListItemText 
                     primary="Tamamlanan Görevler" 
-                    secondary={`${completedTasks.length} görev`} 
+                    secondary={`${taskStats?.counts?.completed || completedTasks.length} görev`} 
                   />
                 </ListItem>
                 <ListItem>
@@ -253,7 +390,7 @@ export default function DashboardPage() {
                   </ListItemAvatar>
                   <ListItemText 
                     primary="Devam Eden Görevler" 
-                    secondary={`${pendingTasks.length} görev`} 
+                    secondary={`${(taskStats?.counts?.in_progress || 0) + (taskStats?.counts?.pending || 0) || pendingTasks.length} görev`} 
                   />
                 </ListItem>
                 <ListItem>
@@ -386,6 +523,75 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </Grid>
+      </Grid>
+
+      {/* Yaklaşan Görevler (Yeni Widget) */}
+      <Grid item xs={12} md={6} lg={6}>
+        <Card sx={{ height: '100%' }}>
+          <CardContent>
+            <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
+              <ScheduleIcon sx={{ mr: 1 }} /> Yaklaşan Görevler
+              {lastUpdate && (
+                <Chip 
+                  label={`Canlı`} 
+                  size="small" 
+                  color="success" 
+                  sx={{ ml: 1, height: 20, fontSize: '0.7rem' }} 
+                />
+              )}
+            </Typography>
+            {upcomingTasks && upcomingTasks.length > 0 ? (
+              <List dense>
+                {upcomingTasks.slice(0, 5).map(task => {
+                  const userInfo = getUserInfo(task.assigned_to);
+                  const dueDate = parseISO(task.due_date);
+                  const today = new Date();
+                  today.setHours(0, 0, 0, 0);
+                  const daysLeft = differenceInDays(dueDate, today);
+                  
+                  return (
+                    <ListItem key={task.id}>
+                      <ListItemAvatar>
+                        <Avatar src={userInfo.avatar} alt={userInfo.name} />
+                      </ListItemAvatar>
+                      <ListItemText
+                        primary={task.title}
+                        secondary={
+                          <>
+                            {userInfo.name} | Bitiş: {format(dueDate, 'dd MMMM yyyy', { locale: tr })}
+                            <Chip 
+                              label={daysLeft <= 1 ? 'Bugün' : `${daysLeft} gün kaldı`}
+                              size="small"
+                              color={daysLeft <= 1 ? 'error' : daysLeft <= 3 ? 'warning' : 'info'}
+                              sx={{ ml: 1, height: 20, fontSize: '0.7rem' }}
+                            />
+                          </>
+                        }
+                      />
+                      <Chip 
+                        label={TASK_STATUS_LABELS[task.status] || task.status}
+                        size="small"
+                        color={getTaskStatusColor(task.status)}
+                        sx={{ ml: 1 }}
+                      />
+                    </ListItem>
+                  );
+                })}
+              </List>
+            ) : (
+              <Box display="flex" alignItems="center" justifyContent="center" minHeight="100px">
+                <Typography variant="body2" color="text.secondary">
+                  Yaklaşan görev bulunmuyor
+                </Typography>
+              </Box>
+            )}
+            {lastUpdate && (
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 1, textAlign: 'right' }}>
+                Son güncelleme: {format(lastUpdate, 'HH:mm:ss', { locale: tr })}
+              </Typography>
+            )}
+          </CardContent>
+        </Card>
       </Grid>
     </Container>
   );

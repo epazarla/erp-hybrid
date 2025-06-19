@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 // Supabase proje bilgileri
-const PROJECT_ID = 'zapavervgikfsmgrvjtu';
+const PROJECT_ID = 'moeiyqdkstvohvhdqipt';
 
 // Supabase bağlantı bilgileri - Çeşitli ortam değişkeni isimlerini destekle
 const supabaseUrl = 
@@ -20,7 +20,7 @@ const supabaseAnonKey =
   process.env.VITE_SUPABASE_ANON_KEY || 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
   process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InphcGF2ZXJ2Z2lrZnNtZ3J2anR1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDk0MjMyNTYsImV4cCI6MjA2NDk5OTI1Nn0.Ys1c5V8UfIzGGZU1Kke4eJ7ibTypY2ILEAOXK-AZDaA'; // Yedek olarak doğrudan anahtarı ekledik
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vZWl5cWRrc3R2b2h2aGRxaXB0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAzNDMwNzQsImV4cCI6MjA2NTkxOTA3NH0.VeXJt54vngZFn71BODTDGGlkjALDAlFiq-LjkXwZ62c'; // Yedek olarak doğrudan anahtarı ekledik
 
 // PostgreSQL doğrudan bağlantı bilgileri (NOT: Bu bilgiler sadece sunucu tarafı uygulamalarda kullanılmalıdır!)
 // Vercel ortam değişkenlerini kullan

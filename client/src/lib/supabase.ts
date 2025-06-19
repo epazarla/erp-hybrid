@@ -36,7 +36,7 @@ const getPostgresPassword = () => {
              return DB_PASSWORD;
            } catch (error) {
              console.warn('db-config.ts bulunamadı, ortam değişkenleri kullanılacak');
-             return '';
+             return 'dMff0qLjbxiOd96J'; // Yeni veritabanı şifresi
            }
          })();
 };

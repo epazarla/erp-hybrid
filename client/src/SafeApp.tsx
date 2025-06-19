@@ -10,7 +10,7 @@ import {
   Paper,
   createTheme
 } from '@mui/material';
-import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
 
 // Basit bir tema oluşturuyoruz
 const theme = createTheme({
@@ -124,6 +124,8 @@ const TeamPage = React.lazy(() => import('./pages/TeamPage'));
 const ClientsPage = React.lazy(() => import('./pages/ClientsPage'));
 const AnalyticsPage = React.lazy(() => import('./pages/AnalyticsPage'));
 const SettingsPage = React.lazy(() => import('./pages/SettingsPage'));
+const LoginPage = React.lazy(() => import('./pages/LoginPage'));
+const RegisterPage = React.lazy(() => import('./pages/RegisterPage'));
 
 // Ana uygulama bileşeni
 function SafeApp() {
@@ -230,27 +232,29 @@ function SafeApp() {
                 ERP Uygulaması
               </Typography>
               
-              {/* Navigasyon */}
-              <Box sx={{ mb: 4, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Button component={Link} to="/" variant="contained">
-                  Ana Sayfa
-                </Button>
-                <Button component={Link} to="/tasks" variant="contained">
-                  Görevler
-                </Button>
-                <Button component={Link} to="/team" variant="contained">
-                  Ekip
-                </Button>
-                <Button component={Link} to="/clients" variant="contained">
-                  Müşteriler
-                </Button>
-                <Button component={Link} to="/analytics" variant="contained">
-                  Analitik
-                </Button>
-                <Button component={Link} to="/settings" variant="contained">
-                  Ayarlar
-                </Button>
-              </Box>
+              {/* Navigasyon - Kullanıcı durumuna göre gösterilecek */}
+              {localStorage.getItem('erp_current_user') ? (
+                <Box sx={{ mb: 4, display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                  <Button component={Link} to="/dashboard" variant="contained">
+                    Dashboard
+                  </Button>
+                  <Button component={Link} to="/tasks" variant="contained">
+                    Görevler
+                  </Button>
+                  <Button component={Link} to="/team" variant="contained">
+                    Ekip
+                  </Button>
+                  <Button component={Link} to="/clients" variant="contained">
+                    Müşteriler
+                  </Button>
+                  <Button component={Link} to="/analytics" variant="contained">
+                    Analitik
+                  </Button>
+                  <Button component={Link} to="/settings" variant="contained">
+                    Ayarlar
+                  </Button>
+                </Box>
+              ) : null}
               
               {/* İçerik */}
               <AppErrorBoundary 
@@ -274,13 +278,48 @@ function SafeApp() {
               >
                 <Suspense fallback={<LoadingFallback />}>
                   <Routes>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/dashboard" element={<DashboardPage />} />
-                    <Route path="/tasks" element={<TasksPage />} />
-                    <Route path="/team" element={<TeamPage />} />
-                    <Route path="/clients" element={<ClientsPage />} />
-                    <Route path="/analytics" element={<AnalyticsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
+                    {/* Ana sayfa yönlendirmesi - Kullanıcı durumuna göre */}
+                    <Route path="/" element={
+                      localStorage.getItem('erp_current_user') 
+                        ? <Navigate to="/dashboard" replace />
+                        : <LoginPage />
+                    } />
+                    
+                    {/* Giriş ve kayıt sayfaları */}
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    
+                    {/* Korumalı sayfalar - Giriş yapmış kullanıcılar için */}
+                    <Route path="/dashboard" element={
+                      localStorage.getItem('erp_current_user')
+                        ? <DashboardPage />
+                        : <Navigate to="/login" replace />
+                    } />
+                    <Route path="/tasks" element={
+                      localStorage.getItem('erp_current_user')
+                        ? <TasksPage />
+                        : <Navigate to="/login" replace />
+                    } />
+                    <Route path="/team" element={
+                      localStorage.getItem('erp_current_user')
+                        ? <TeamPage />
+                        : <Navigate to="/login" replace />
+                    } />
+                    <Route path="/clients" element={
+                      localStorage.getItem('erp_current_user')
+                        ? <ClientsPage />
+                        : <Navigate to="/login" replace />
+                    } />
+                    <Route path="/analytics" element={
+                      localStorage.getItem('erp_current_user')
+                        ? <AnalyticsPage />
+                        : <Navigate to="/login" replace />
+                    } />
+                    <Route path="/settings" element={
+                      localStorage.getItem('erp_current_user')
+                        ? <SettingsPage />
+                        : <Navigate to="/login" replace />
+                    } />
                     <Route 
                       path="*" 
                       element={

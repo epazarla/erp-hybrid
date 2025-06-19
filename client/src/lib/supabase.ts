@@ -20,7 +20,7 @@ const supabaseAnonKey =
   process.env.VITE_SUPABASE_ANON_KEY || 
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 
   process.env.SUPABASE_ANON_KEY ||
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vZWl5cWRrc3R2b2h2aGRxaXB0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTAzNDMwNzQsImV4cCI6MjA2NTkxOTA3NH0.VeXJt54vngZFn71BODTDGGlkjALDAlFiq-LjkXwZ62c'; // Yedek olarak doğrudan anahtarı ekledik
+  'lpwImdro85B38MeEbfMckmtgyx/vxD45i/pfDXwpp6p0g7pECcrhtL6ndq2D2NY0U+/fzfPbImUaFq+s1JzvzA=='; // Yedek olarak doğrudan anahtarı ekledik
 
 // PostgreSQL doğrudan bağlantı bilgileri (NOT: Bu bilgiler sadece sunucu tarafı uygulamalarda kullanılmalıdır!)
 // Vercel ortam değişkenlerini kullan

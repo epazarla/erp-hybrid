@@ -25,25 +25,21 @@ import {
 } from '@mui/icons-material';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { 
-  getAllUsers, 
-  loadUsersFromStorage, 
+  loadAllUsers,
+  loginUser,
   setCurrentUser,
-  User,
-  USERS_STORAGE_KEY
+  UserView,
+  CURRENT_USER_STORAGE_KEY
 } from '../services/UserService';
 
-// Varsayılan kullanıcıları yeniden oluştur
-const resetUserStorage = () => {
+// Kullanıcı oturumunu temizle
+const resetUserSession = () => {
   try {
     // LocalStorage'dan kullanıcı verisini temizle
-    localStorage.removeItem(USERS_STORAGE_KEY);
-    
-    // Kullanıcıları yeniden yükle (bu, varsayılan kullanıcıları oluşturacak)
-    const users = loadUsersFromStorage();
-    
+    localStorage.removeItem(CURRENT_USER_STORAGE_KEY);
     return true;
   } catch (error) {
-    console.error('Kullanıcı verileri sıfırlanırken hata oluştu:', error);
+    console.error('Kullanıcı oturumu temizlenirken hata oluştu:', error);
     return false;
   }
 };
@@ -87,49 +83,45 @@ export default function LoginPage() {
         return;
       }
       
-      // Kullanıcıları getir
-      const users = getAllUsers();
+      // Supabase ile giriş işlemi
+      const result = await loginUser(email, password);
       
-      // E-posta ve şifre kontrolü
-      const user = users.find(u => 
-        u.email.toLowerCase() === email.toLowerCase() && 
-        // Gerçek bir uygulamada şifre hash'leri karşılaştırılmalı
-        // Bu örnek için basit bir kontrol yapıyoruz
-        (u.password === password || password === 'mikkel56M') // Admin şifresi
-      );
+      if (!result.success) {
+        console.log('Giriş başarısız:', result.message);
+        setError(result.message || 'Geçersiz e-posta veya şifre');
+        setLoading(false);
+        return;
+      }
       
-      if (!user) {
-        console.log('Giriş başarısız: Kullanıcı bulunamadı veya şifre yanlış');
-        console.log('Aranan e-posta:', email.toLowerCase());
-        console.log('Mevcut kullanıcılar:', users.map(u => u.email.toLowerCase()));
-        
-        setError('Geçersiz e-posta veya şifre');
+      // Kullanıcı objesi var mı kontrol et
+      if (!result.user) {
+        setError('Kullanıcı bilgileri alınamadı');
         setLoading(false);
         return;
       }
       
       // Kullanıcı onaylanmış mı kontrol et
-      if (user.approvalStatus === 'pending') {
+      if (result.user.approvalStatus === 'pending') {
         setError('Hesabınız henüz onaylanmamış. Lütfen yönetici onayını bekleyin.');
         setLoading(false);
         return;
       }
       
-      if (user.approvalStatus === 'rejected') {
+      if (result.user.approvalStatus === 'rejected') {
         setError('Hesabınız reddedildi. Lütfen yönetici ile iletişime geçin.');
         setLoading(false);
         return;
       }
       
       // Kullanıcı aktif mi kontrol et
-      if (user.status === 'inactive') {
+      if (result.user.status === 'inactive') {
         setError('Hesabınız pasif durumda. Lütfen yönetici ile iletişime geçin.');
         setLoading(false);
         return;
       }
       
-      // Giriş başarılı, kullanıcıyı ayarla
-      setCurrentUser(user);
+      // Giriş başarılı, kullanıcı zaten loginUser fonksiyonu içinde ayarlandı
+      console.log('Giriş başarılı:', result.user.name);
       
       // Kısa bir gecikme ile dashboard'a yönlendir
       setTimeout(() => {
@@ -144,14 +136,15 @@ export default function LoginPage() {
     }
   };
   
-  // Kullanıcı verilerini sıfırla
-  const handleResetUserData = () => {
-    const success = resetUserStorage();
+  // Kullanıcı oturumunu temizle
+  const handleResetUserData = async () => {
+    const success = await resetUserSession();
+    setResetSuccess(success);
+    
     if (success) {
-      setResetSuccess(true);
-      setTimeout(() => setResetSuccess(false), 3000);
-    } else {
-      setError('Kullanıcı verileri sıfırlanırken bir hata oluştu.');
+      setEmail('');
+      setPassword('');
+      setError(null);
     }
   };
   
@@ -295,10 +288,10 @@ export default function LoginPage() {
               size="small"
               sx={{ mt: 1 }}
             >
-              Kullanıcı Verilerini Sıfırla
+              Oturumu Temizle
             </Button>
             <Typography variant="caption" display="block" sx={{ mt: 1, color: 'text.secondary' }}>
-              Giriş yapamıyorsanız, kullanıcı verilerini sıfırlayabilirsiniz.
+              Giriş yapamıyorsanız, oturum verilerini temizleyebilirsiniz.
             </Typography>
           </Box>
         </Box>
@@ -309,7 +302,7 @@ export default function LoginPage() {
         open={resetSuccess}
         autoHideDuration={3000}
         onClose={() => setResetSuccess(false)}
-        message="Kullanıcı verileri başarıyla sıfırlandı"
+        message="Oturum başarıyla temizlendi"
       />
     </Container>
   );

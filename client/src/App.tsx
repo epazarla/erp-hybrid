@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress } from '@mui/material';
+import React, { useState, useEffect, ErrorInfo, ReactNode } from 'react';
+import { ThemeProvider, CssBaseline, Box, Typography, CircularProgress, Button, Alert, Paper } from '@mui/material';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { lightTheme, darkTheme } from './theme';
+import { testSupabaseConnection } from './lib/supabase';
 
 // Pages
 import BasicPage from './pages/BasicPage';
@@ -12,6 +13,7 @@ import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import AdminPage from './pages/AdminPage';
 
 // Components
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -52,11 +54,68 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return isAuthenticated ? <>{children}</> : null;
 };
 
+// Hata sınırı bileşeni
+class ErrorBoundary extends React.Component<{children: ReactNode}, {hasError: boolean; error: Error | null; info: ErrorInfo | null}> {
+  constructor(props: {children: ReactNode}) {
+    super(props);
+    this.state = { hasError: false, error: null, info: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    // Hata durumunda state'i güncelle
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    // Hata bilgilerini logla
+    console.error('Uygulama hatası:', error);
+    console.error('Bileşen yığın izleme:', info.componentStack);
+    this.setState({ info });
+  }
+
+  handleRetry = () => {
+    // Sayfayı yeniden yükle
+    window.location.reload();
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // Hata durumunda kullanıcı dostu bir arayüz göster
+      return (
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', p: 3 }}>
+          <Paper elevation={3} sx={{ p: 4, maxWidth: 600, width: '100%', textAlign: 'center' }}>
+            <Typography variant="h5" color="error" gutterBottom>
+              Sayfa Yüklenirken Hata Oluştu
+            </Typography>
+            <Typography variant="body1" sx={{ my: 2 }}>
+              Üzünüz, bu sayfa yüklenirken bir hata oluştu. Lütfen daha sonra tekrar deneyin.
+            </Typography>
+            <Alert severity="error" sx={{ my: 2, textAlign: 'left' }}>
+              {this.state.error?.message || 'Bilinmeyen hata'}
+            </Alert>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={this.handleRetry}
+              sx={{ mt: 2 }}
+            >
+              SAYFAYI YENİLE
+            </Button>
+          </Paper>
+        </Box>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Ana uygulama bileşeni
 function AppContent() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [darkMode, setDarkMode] = useState(false);
+  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -66,27 +125,49 @@ function AppContent() {
     // Yükleme ekranını göster
     setLoading(true);
     
-    try {
-      // Mevcut kullanıcıyı al
-      const user = UserService.getCurrentUser();
-      console.log('Mevcut kullanıcı:', user);
-      
-      if (user) {
+    // Supabase bağlantısını kontrol et
+    const checkSupabaseConnection = async () => {
+      try {
+        const isConnected = await testSupabaseConnection();
+        setSupabaseConnected(isConnected);
+        
+        if (!isConnected) {
+          console.error('Supabase bağlantısı başarısız. Veriler yüklenemeyebilir.');
+          throw new Error('Veritabanı bağlantısı sağlanamıyor. Lütfen daha sonra tekrar deneyin.');
+        }
+      } catch (error) {
+        console.error('Supabase bağlantı kontrolü sırasında hata:', error);
+        setSupabaseConnected(false);
+      }
+    };
+    
+    // Kullanıcı bilgilerini yükle
+    const loadUser = async () => {
+      try {
+        await checkSupabaseConnection();
+        const user = UserService.getCurrentUser();
         setCurrentUser(user);
+        
+        // Kullanıcı giriş yapmamışsa ve korumalı bir sayfada değilse
+        if (!user && !isPublicRoute(location.pathname)) {
+          navigate('/login', { replace: true });
+        }
+      } catch (error) {
+        console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+      } finally {
+        setLoading(false);
       }
-      
-      // Kullanıcı giriş yapmamışsa ve korumalı bir sayfada değilse
-      if (!user && !isPublicRoute(location.pathname)) {
-        navigate('/login', { replace: true });
-      }
-    } catch (error) {
-      console.error('Kullanıcı yüklenirken hata:', error);
-    } finally {
-      // Yükleme tamamlandı
-      setLoading(false);
+    };
+
+    loadUser();
+
+    // Tema tercihini localStorage'dan al
+    const savedTheme = localStorage.getItem('darkMode');
+    if (savedTheme) {
+      setDarkMode(savedTheme === 'true');
     }
   }, [navigate, location]);
-  
+
   // Genel erişime açık rotaları kontrol et
   const isPublicRoute = (path: string) => {
     return path === '/login' || path === '/register' || path === '/forgot-password';
@@ -194,6 +275,11 @@ function AppContent() {
                 <SettingsPage />
               </ProtectedRoute>
             } />
+            <Route path="/admin" element={
+              <ProtectedRoute>
+                <AdminPage />
+              </ProtectedRoute>
+            } />
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
           </Routes>
         </DashboardLayout>
@@ -210,14 +296,13 @@ function AppContent() {
 }
 
 // Ana uygulama bileşeni
-function App() {
+export default function App() {
   console.log('App component rendering');
   return (
     <BrowserRouter>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </BrowserRouter>
   );
-
 }
-
-export default App;

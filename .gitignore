@@ -12,6 +12,9 @@ coverage/
 *.env.local
 *.env.*.local
 
+# Hassas veritabanı bilgileri
+client/src/config/db-config.ts
+
 # Logs
 logs
 *.log

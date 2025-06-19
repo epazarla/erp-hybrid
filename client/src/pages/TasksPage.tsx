@@ -274,62 +274,111 @@ const TasksPage: React.FC = (): React.ReactNode => {
 
   // Görevleri, kullanıcıları ve müşterileri yükle
   useEffect(() => {
-    // loadTasks asenkron olduğu için async IIFE kullanıyoruz
-    (async () => {
+    // Ana veri yükleme fonksiyonu
+    const initializeData = async () => {
       try {
-        await loadTasks();
+        console.log('TasksPage: Sayfa verileri yükleniyor...');
+        setLoading(true);
+        
+        // Mevcut kullanıcıyı yükle
+        try {
+          const user = await getCurrentUser();
+          if (user) {
+            console.log('TasksPage: Mevcut kullanıcı yüklendi:', user.name);
+            setCurrentUser(user);
+          } else {
+            console.warn('TasksPage: Mevcut kullanıcı bulunamadı');
+          }
+        } catch (userError) {
+          console.error('TasksPage: Mevcut kullanıcı yüklenirken hata:', userError);
+        }
+        
+        // Görevleri yükle
+        try {
+          await loadTasks();
+          console.log('TasksPage: Görevler başarıyla yüklendi');
+        } catch (tasksError) {
+          console.error('TasksPage: Görevler yüklenirken hata:', tasksError);
+        }
+        
+        // Kullanıcıları yükle
+        try {
+          await loadUsers();
+          console.log('TasksPage: Kullanıcılar başarıyla yüklendi');
+        } catch (usersError) {
+          console.error('TasksPage: Kullanıcılar yüklenirken hata:', usersError);
+        }
+        
+        // Müşterileri yükle
+        try {
+          await loadClients();
+          console.log('TasksPage: Müşteriler başarıyla yüklendi');
+        } catch (clientsError) {
+          console.error('TasksPage: Müşteriler yüklenirken hata:', clientsError);
+        }
+        
       } catch (error) {
-        console.error('Görevler yüklenirken hata:', error);
+        console.error('TasksPage: Sayfa verileri yüklenirken genel hata:', error);
+      } finally {
+        setLoading(false);
       }
-    })();
+    };
     
-    loadUsers();
-    
-    // loadClients asenkron olduğu için async IIFE kullanıyoruz
-    (async () => {
-      try {
-        await loadClients();
-      } catch (error) {
-        console.error('Müşteriler yüklenirken hata:', error);
-      }
-    })();
+    // Sayfa yüklendiğinde verileri başlat
+    initializeData();
     
     // Varsayılan olarak ilk kullanıcıyı mevcut kullanıcı olarak ayarla
     // Gerçek uygulamada bu, oturum açma sisteminden gelecektir
     
     // Görev güncellemelerini dinle
-    const handleTasksUpdated = async () => {
-      console.log('Görevler güncellendi, yeniden yükleniyor...');
-      await loadTasks();
+    const handleTasksUpdated = async (event: Event) => {
+      try {
+        console.log('TasksPage: Görevler güncellendi, yeniden yükleniyor...');
+        await loadTasks();
+      } catch (error) {
+        console.error('TasksPage: Görevler güncellenirken hata:', error);
+      }
     };
     
     // Müşteri güncellemelerini dinle
-    const handleClientsUpdated = (event: Event) => {
-      console.log('Müşteriler güncellendi, yeniden yükleniyor...');
-      const customEvent = event as CustomEvent;
-      // Eğer event içinde güncel müşteri listesi varsa, doğrudan kullan
-      if (customEvent.detail?.clients && Array.isArray(customEvent.detail.clients)) {
-        setActiveClients(customEvent.detail.clients.filter((client: Client) => client.is_active));
-        console.log(`Görev sayfası için ${customEvent.detail.clients.filter((client: Client) => client.is_active).length} aktif müşteri güncellendi`);
-      } else {
-        // Yoksa API'den yeniden yükle
-        loadClients();
+    const handleClientsUpdated = async (event: Event) => {
+      try {
+        console.log('TasksPage: Müşteriler güncellendi, yeniden yükleniyor...');
+        const customEvent = event as CustomEvent;
+        // Eğer event içinde güncel müşteri listesi varsa, doğrudan kullan
+        if (customEvent.detail?.clients && Array.isArray(customEvent.detail.clients)) {
+          setActiveClients(customEvent.detail.clients.filter((client: Client) => client.is_active));
+          console.log(`TasksPage: Görev sayfası için ${customEvent.detail.clients.filter((client: Client) => client.is_active).length} aktif müşteri güncellendi`);
+        } else {
+          // Yoksa API'den yeniden yükle
+          await loadClients();
+        }
+      } catch (error) {
+        console.error('TasksPage: Müşteriler güncellenirken hata:', error);
       }
     };
     
     // Kullanıcı güncellemelerini dinle
-    const handleUsersUpdated = () => {
-      console.log('Kullanıcılar güncellendi, aktif kullanıcılar yeniden yükleniyor...');
-      loadUsers();
+    const handleUsersUpdated = async () => {
+      try {
+        console.log('TasksPage: Kullanıcılar güncellendi, aktif kullanıcılar yeniden yükleniyor...');
+        await loadUsers();
+      } catch (error) {
+        console.error('TasksPage: Kullanıcılar güncellenirken hata:', error);
+      }
     };
 
     // Kullanıcı değişikliklerini dinle
-    const handleUserSwitched = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const user = customEvent.detail?.user;
-      if (user) {
-        setCurrentUser(user);
-        console.log('Kullanıcı değişti:', user);
+    const handleUserSwitched = async (event: Event) => {
+      try {
+        const customEvent = event as CustomEvent;
+        const user = customEvent.detail?.user;
+        if (user) {
+          setCurrentUser(user);
+          console.log('TasksPage: Kullanıcı değişti:', user.name);
+        }
+      } catch (error) {
+        console.error('TasksPage: Kullanıcı değişikliği işlenirken hata:', error);
       }
     };
     
@@ -349,11 +398,49 @@ const TasksPage: React.FC = (): React.ReactNode => {
   // Görevleri yükle
   const loadTasks = async () => {
     try {
-      console.log('Görevler yükleniyor...');
+      console.log('TasksPage: Görevler yükleniyor...');
+      setLoading(true);
       
       // Supabase'den en güncel görevleri al
-      const allTasks = await getAllTasks();
-      console.log(`Yüklenen görev sayısı: ${allTasks.length}`);
+      let allTasks = [];
+      try {
+        allTasks = await getAllTasks();
+        console.log(`TasksPage: Yüklenen görev sayısı: ${allTasks.length}`);
+        
+        // Başarılı veriyi localStorage'a yedekle
+        if (allTasks && allTasks.length > 0) {
+          try {
+            localStorage.setItem('erp_tasks_cache', JSON.stringify(allTasks));
+            console.log('TasksPage: Görevler localStorage\'a yedeklendi');
+          } catch (cacheError) {
+            console.warn('TasksPage: Görevler localStorage\'a yedeklenemedi:', cacheError);
+          }
+        }
+      } catch (fetchError) {
+        console.error('TasksPage: Supabase\'den görevler yüklenirken hata:', fetchError);
+        
+        // Supabase bağlantı hatası durumunda localStorage'dan yedek veriyi yükle
+        try {
+          const cachedTasks = localStorage.getItem('erp_tasks_cache');
+          if (cachedTasks) {
+            allTasks = JSON.parse(cachedTasks);
+            console.log(`TasksPage: Yedekten ${allTasks.length} görev yüklendi`);
+            setSnackbar({
+              open: true,
+              message: 'Sunucu bağlantısı sorunu. Yedek veriler gösteriliyor.',
+              severity: 'info'
+            });
+          } else {
+            console.warn('TasksPage: Yedek görev verisi bulunamadı');
+            allTasks = [];
+          }
+        } catch (cacheError) {
+          console.error('TasksPage: Yedek görev verisi yüklenirken hata:', cacheError);
+          allTasks = [];
+        }
+      }
+      
+      // Görevleri state'e kaydet
       setTasks(allTasks);
       
       // Görev durumlarına göre sayıları hesapla
@@ -362,136 +449,301 @@ const TasksPage: React.FC = (): React.ReactNode => {
         statusCounts[status] = allTasks.filter((task: Task) => task.status === status).length;
       });
       setTasksByStatus(statusCounts);
-      console.log('Görev durumları sayıldı:', statusCounts);
+      console.log('TasksPage: Görev durumları sayıldı:', statusCounts);
       
       // Yakın zamanda bitiş tarihi olan görevleri filtrele
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const nextWeek = new Date(today);
-      nextWeek.setDate(today.getDate() + 7);
-      
-      const upcomingTasksList = allTasks
-        .filter((task: Task) => {
-          const dueDate = new Date(task.due_date);
-          dueDate.setHours(0, 0, 0, 0);
-          return dueDate >= today && dueDate <= nextWeek && task.status !== 'completed' && task.status !== 'cancelled';
-        })
-        .sort((a: Task, b: Task) => new Date(a.due_date).getTime() - new Date(b.due_date).getTime());
-      
-      setUpcomingTasks(upcomingTasksList);
-      console.log(`Yaklaşan görev sayısı: ${upcomingTasksList.length}`);
+      try {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        const nextWeek = new Date(today);
+        nextWeek.setDate(today.getDate() + 7);
+        
+        const upcomingTasksList = allTasks
+          .filter((task: Task) => {
+            try {
+              if (!task.due_date) return false;
+              const dueDate = new Date(task.due_date);
+              dueDate.setHours(0, 0, 0, 0);
+              return dueDate >= today && dueDate <= nextWeek && task.status !== 'completed' && task.status !== 'cancelled';
+            } catch (dateError) {
+              console.warn(`TasksPage: Görev tarih işleme hatası (görev ID: ${task.id}):`, dateError);
+              return false;
+            }
+          })
+          .sort((a: Task, b: Task) => {
+            try {
+              return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+            } catch (sortError) {
+              console.warn('TasksPage: Görev sıralama hatası:', sortError);
+              return 0;
+            }
+          });
+        
+        setUpcomingTasks(upcomingTasksList);
+        console.log(`TasksPage: Yaklaşan görev sayısı: ${upcomingTasksList.length}`);
+      } catch (dateFilterError) {
+        console.error('TasksPage: Yaklaşan görevler hesaplanırken hata:', dateFilterError);
+        setUpcomingTasks([]);
+      }
       
       // Tamamlanan görevleri filtrele
-      const completedTasksList = allTasks
-        .filter((task: Task) => task.status === 'completed')
-        .sort((a: Task, b: Task) => new Date(b.due_date).getTime() - new Date(a.due_date).getTime());
-      
-      setCompletedTasks(completedTasksList);
-      console.log(`Tamamlanan görev sayısı: ${completedTasksList.length}`);
+      try {
+        const completedTasksList = allTasks
+          .filter((task: Task) => task.status === 'completed')
+          .sort((a: Task, b: Task) => {
+            try {
+              return new Date(b.due_date).getTime() - new Date(a.due_date).getTime();
+            } catch (sortError) {
+              console.warn('TasksPage: Tamamlanan görev sıralama hatası:', sortError);
+              return 0;
+            }
+          });
+        
+        setCompletedTasks(completedTasksList);
+        console.log(`TasksPage: Tamamlanan görev sayısı: ${completedTasksList.length}`);
+      } catch (completedFilterError) {
+        console.error('TasksPage: Tamamlanan görevler hesaplanırken hata:', completedFilterError);
+        setCompletedTasks([]);
+      }
       
       // Görev tamamlanma oranını hesapla
-      if (allTasks.length > 0) {
-        const completionRate = Math.round((completedTasksList.length / allTasks.length) * 100);
-        setTaskCompletionRate(completionRate);
-        console.log(`Görev tamamlanma oranı: %${completionRate}`);
-        
-        // Görev tamamlama verilerini dashboard'a ilet
-        await updateTaskCompletionStats('tasks-page-load', allTasks);
-        console.log(`Görev tamamlanma verileri dashboard'a iletildi.`);
-      } else {
+      try {
+        if (allTasks.length > 0) {
+          const completedCount = allTasks.filter((task: Task) => task.status === 'completed').length;
+          const completionRate = Math.round((completedCount / allTasks.length) * 100);
+          setTaskCompletionRate(completionRate);
+          console.log(`TasksPage: Görev tamamlanma oranı: %${completionRate}`);
+          
+          // Görev tamamlama verilerini dashboard'a ilet
+          try {
+            await updateTaskCompletionStats('tasks-page-load', allTasks);
+            console.log(`TasksPage: Görev tamamlanma verileri dashboard'a iletildi`);
+          } catch (statsError) {
+            console.error('TasksPage: Görev tamamlanma verileri iletilemedi:', statsError);
+          }
+        } else {
+          setTaskCompletionRate(0);
+        }
+      } catch (rateError) {
+        console.error('TasksPage: Görev tamamlanma oranı hesaplanırken hata:', rateError);
         setTaskCompletionRate(0);
       }
       
       // Kategorileri topla
-      const uniqueCategories = Array.from(new Set(allTasks.filter((task: Task) => task.category).map((task: Task) => task.category as string)));
-      setCategories(uniqueCategories);
-      console.log(`Kategori sayısı: ${uniqueCategories.length}`);
-      
-      // Yeni görev için varsayılan değerleri ayarla
-      if (currentUser) {
-        setNewTask({
-          ...newTask,
-          assigned_to: currentUser.id,
-          status: 'pending',
-          priority: 'medium',
-          due_date: new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-        });
+      try {
+        const uniqueCategories = Array.from(new Set(
+          allTasks
+            .filter((task: Task) => task.category)
+            .map((task: Task) => task.category as string)
+        )) as string[];
+        setCategories(uniqueCategories);
+        console.log(`TasksPage: Kategori sayısı: ${uniqueCategories.length}`);
+      } catch (categoryError) {
+        console.error('TasksPage: Kategoriler hesaplanırken hata:', categoryError);
+        setCategories([]);
       }
       
-      console.log('Görevler başarıyla yüklendi');
+      // Yeni görev için varsayılan değerleri ayarla
+      try {
+        if (currentUser) {
+          const nextWeekDate = new Date(new Date().getTime() + 7 * 24 * 60 * 60 * 1000);
+          setNewTask({
+            ...newTask,
+            assigned_to: currentUser.id,
+            status: 'pending',
+            priority: 'medium',
+            due_date: nextWeekDate.toISOString().split('T')[0]
+          });
+        }
+      } catch (defaultsError) {
+        console.error('TasksPage: Yeni görev varsayılan değerleri ayarlanırken hata:', defaultsError);
+      }
+      
+      console.log('TasksPage: Görevler başarıyla yüklendi');
     } catch (error) {
-      console.error('Görevler yüklenirken hata oluştu:', error);
+      console.error('TasksPage: Görevler yüklenirken genel hata:', error);
+      setSnackbar({
+        open: true,
+        message: 'Görevler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   // Kullanıcıları yükle
-  const loadUsers = () => {
+  const loadUsers = async () => {
     try {
+      console.log('TasksPage: Kullanıcılar yükleniyor...');
+      setLoading(true);
+      
       // Tüm kullanıcıları getir (ekip sayfasından senkronize edilmiş veriler)
-      const allUsers = getActiveUsers();
+      let allUsers = [];
+      try {
+        allUsers = await getActiveUsers();
+        console.log(`TasksPage: ${allUsers.length} kullanıcı Supabase'den yüklendi`);
+        
+        // Başarılı veriyi localStorage'a yedekle
+        if (allUsers && allUsers.length > 0) {
+          try {
+            localStorage.setItem('erp_users_cache', JSON.stringify(allUsers));
+            console.log('TasksPage: Kullanıcılar localStorage\'a yedeklendi');
+          } catch (cacheError) {
+            console.warn('TasksPage: Kullanıcılar localStorage\'a yedeklenemedi:', cacheError);
+          }
+        }
+      } catch (fetchError) {
+        console.error('TasksPage: Supabase\'den kullanıcılar yüklenirken hata:', fetchError);
+        
+        // Supabase bağlantı hatası durumunda localStorage'dan yedek veriyi yükle
+        try {
+          const cachedUsers = localStorage.getItem('erp_users_cache');
+          if (cachedUsers) {
+            allUsers = JSON.parse(cachedUsers);
+            console.log(`TasksPage: Yedekten ${allUsers.length} kullanıcı yüklendi`);
+            setSnackbar({
+              open: true,
+              message: 'Sunucu bağlantısı sorunu. Yedek kullanıcı verileri gösteriliyor.',
+              severity: 'info'
+            });
+          } else {
+            console.warn('TasksPage: Yedek kullanıcı verisi bulunamadı');
+            allUsers = [];
+          }
+        } catch (cacheError) {
+          console.error('TasksPage: Yedek kullanıcı verisi yüklenirken hata:', cacheError);
+          allUsers = [];
+        }
+      }
       
       // Departmanlara göre kullanıcıları grupla
       const departmentUsers: Record<string, User[]> = {};
       
       // Aktif kullanıcıları filtrele
-      const users = allUsers.filter(user => {
-        // Sadece aktif kullanıcıları al
-        const isActive = user.status === 'active' || (user.status === undefined && user.isActive !== false);
-        
-        // Departman bilgisine göre grupla
-        if (user.department && isActive) {
-          if (!departmentUsers[user.department]) {
-            departmentUsers[user.department] = [];
+      try {
+        const users = allUsers.filter((user: User) => {
+          try {
+            // Sadece aktif kullanıcıları al
+            const isActive = user.status === 'active' || (user.status === undefined && user.is_active !== false);
+            
+            // Departman bilgisine göre grupla
+            if (user.department && isActive) {
+              if (!departmentUsers[user.department]) {
+                departmentUsers[user.department] = [];
+              }
+              departmentUsers[user.department].push(user);
+            }
+            
+            return isActive;
+          } catch (userError) {
+            console.warn(`TasksPage: Kullanıcı işlenirken hata (ID: ${user.id || 'bilinmiyor'}):`, userError);
+            return false;
           }
-          departmentUsers[user.department].push(user);
+        });
+        
+        // Aktif kullanıcıları ve departman gruplarını ayarla
+        setUsers(users);
+        setUsersByDepartment(departmentUsers);
+        console.log(`TasksPage: ${users.length} aktif kullanıcı filtrelendi`);
+        console.log('TasksPage: Departmanlara göre kullanıcılar:', departmentUsers);
+        
+        // Eğer mevcut kullanıcı henüz ayarlanmamışsa ve kullanıcı listesi doluysa
+        // ilk kullanıcıyı mevcut kullanıcı olarak ayarla
+        if (!currentUser && users.length > 0) {
+          setCurrentUser(users[0]);
+          console.log('TasksPage: İlk kullanıcı varsayılan olarak ayarlandı:', users[0].name);
         }
         
-        return isActive;
-      });
-      
-      // Aktif kullanıcıları ve departman gruplarını ayarla
-      setUsers(users);
-      setUsersByDepartment(departmentUsers);
-      console.log(`${users.length} aktif kullanıcı yüklendi`);
-      console.log('Departmanlara göre kullanıcılar:', departmentUsers);
-      
-      // Eğer mevcut kullanıcı henüz ayarlanmamışsa ve kullanıcı listesi doluysa
-      // ilk kullanıcıyı mevcut kullanıcı olarak ayarla
-      if (!currentUser && users.length > 0) {
-        setCurrentUser(users[0]);
-      }
-      
-      // Yeni kullanıcı yoksa ve görev atanacak kişi seçilmişse, seçimi sıfırla
-      if (users.length === 0 && newTask.assigned_to !== 0) {
-        setNewTask({...newTask, assigned_to: 0});
-      } else if (newTask.assigned_to !== 0) {
-        // Seçili kullanıcı hala aktif mi kontrol et
-        const isAssignedUserStillActive = users.some(user => user.id === newTask.assigned_to);
-        if (!isAssignedUserStillActive) {
+        // Yeni kullanıcı yoksa ve görev atanacak kişi seçilmişse, seçimi sıfırla
+        if (users.length === 0 && newTask.assigned_to !== 0) {
           setNewTask({...newTask, assigned_to: 0});
-          setSnackbar({
-            open: true,
-            message: 'Seçili kullanıcı artık aktif değil, lütfen başka bir kullanıcı seçin',
-            severity: 'info'
-          });
+          console.log('TasksPage: Aktif kullanıcı olmadığı için görev ataması sıfırlandı');
+        } else if (newTask.assigned_to !== 0) {
+          // Seçili kullanıcı hala aktif mi kontrol et
+          const isAssignedUserStillActive = users.some((user: User) => user.id === newTask.assigned_to);
+          if (!isAssignedUserStillActive) {
+            setNewTask({...newTask, assigned_to: 0});
+            setSnackbar({
+              open: true,
+              message: 'Seçili kullanıcı artık aktif değil, lütfen başka bir kullanıcı seçin',
+              severity: 'info'
+            });
+            console.log('TasksPage: Seçili kullanıcı artık aktif olmadığı için görev ataması sıfırlandı');
+          }
         }
+      } catch (filterError) {
+        console.error('TasksPage: Kullanıcıları filtrelerken hata:', filterError);
+        setUsers([]);
+        setUsersByDepartment({});
       }
     } catch (error) {
-      console.error('Kullanıcılar yüklenirken hata oluştu:', error);
+      console.error('TasksPage: Kullanıcılar yüklenirken genel hata:', error);
+      setSnackbar({
+        open: true,
+        message: 'Kullanıcılar yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.',
+        severity: 'error'
+      });
+    } finally {
+      setLoading(false);
     }
   };
 
   // Müşterileri yükle
   const loadClients = async () => {
     try {
-      const clients = await getAllClients(true); // Sadece aktif müşterileri getir
+      console.log('TasksPage: Müşteriler yükleniyor...');
+      
+      let clients = [];
+      try {
+        clients = await getAllClients(true); // Sadece aktif müşterileri getir
+        console.log(`TasksPage: ${clients.length} aktif müşteri Supabase'den yüklendi`);
+        
+        // Başarılı veriyi localStorage'a yedekle
+        if (clients && clients.length > 0) {
+          try {
+            localStorage.setItem('erp_clients_cache', JSON.stringify(clients));
+            console.log('TasksPage: Müşteriler localStorage\'a yedeklendi');
+          } catch (cacheError) {
+            console.warn('TasksPage: Müşteriler localStorage\'a yedeklenemedi:', cacheError);
+          }
+        }
+      } catch (fetchError) {
+        console.error('TasksPage: Supabase\'den müşteriler yüklenirken hata:', fetchError);
+        
+        // Supabase bağlantı hatası durumunda localStorage'dan yedek veriyi yükle
+        try {
+          const cachedClients = localStorage.getItem('erp_clients_cache');
+          if (cachedClients) {
+            clients = JSON.parse(cachedClients);
+            console.log(`TasksPage: Yedekten ${clients.length} müşteri yüklendi`);
+            setSnackbar({
+              open: true,
+              message: 'Sunucu bağlantısı sorunu. Yedek müşteri verileri gösteriliyor.',
+              severity: 'info'
+            });
+          } else {
+            console.warn('TasksPage: Yedek müşteri verisi bulunamadı');
+            clients = [];
+          }
+        } catch (cacheError) {
+          console.error('TasksPage: Yedek müşteri verisi yüklenirken hata:', cacheError);
+          clients = [];
+        }
+      }
+      
       setActiveClients(clients);
-      console.log(`Görev sayfası için ${clients.length} aktif müşteri yüklendi`);
+      console.log(`TasksPage: Görev sayfası için ${clients.length} aktif müşteri ayarlandı`);
     } catch (error) {
-      console.error('Müşteriler yüklenirken hata oluştu:', error);
+      console.error('TasksPage: Müşteriler yüklenirken genel hata:', error);
       // Hata durumunda boş dizi atayalım ki map hatası oluşmasın
       setActiveClients([]);
+      setSnackbar({
+        open: true,
+        message: 'Müşteriler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.',
+        severity: 'error'
+      });
     }
   };
 

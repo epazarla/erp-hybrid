@@ -178,23 +178,34 @@ export default function TeamPage() {
   
   // Ekip üyelerini UserService ile senkronize et ve mevcut kullanıcıyı yükle
   useEffect(() => {
-    // Ekip üyelerini UserService'e gönder
-    if (teamMembers.length > 0) {
-      syncTeamMembers(teamMembers);
-      console.log('Ekip üyeleri UserService ile senkronize edildi', teamMembers);
-      
-      // Mevcut kullanıcıyı yükle
-      const user = getCurrentUser();
-      if (user) {
-        const currentTeamMember = teamMembers.find(m => m.id === user.id);
-        if (currentTeamMember) {
-          setCurrentUserState(currentTeamMember);
+    const initTeam = async () => {
+      try {
+        console.log('TeamPage: Ekip üyeleri yükleniyor...');
+        
+        // Ekip üyelerini UserService'e gönder
+        if (teamMembers.length > 0) {
+          await syncTeamMembers(teamMembers);
+          console.log('TeamPage: Ekip üyeleri UserService ile senkronize edildi', teamMembers);
+          
+          // Mevcut kullanıcıyı yükle
+          const user = await getCurrentUser();
+          if (user) {
+            const currentTeamMember = teamMembers.find(m => m.id === user.id);
+            if (currentTeamMember) {
+              setCurrentUserState(currentTeamMember);
+              console.log(`TeamPage: Aktif kullanıcı yüklendi: ${currentTeamMember.name}`);
+            }
+          }
         }
+        
+        // Onay bekleyen kullanıcıları yükle
+        await loadPendingApprovalUsers();
+      } catch (error) {
+        console.error('TeamPage: Ekip üyeleri yüklenirken hata:', error);
       }
-    }
+    };
     
-    // Onay bekleyen kullanıcıları yükle
-    loadPendingApprovalUsers();
+    initTeam();
     
     // Kullanıcı güncellemelerini dinle
     window.addEventListener(USERS_UPDATED_EVENT, handleUsersUpdated);
@@ -209,15 +220,23 @@ export default function TeamPage() {
   }, []);
   
   // Kullanıcı güncellemelerini dinle
-  const handleUsersUpdated = () => {
-    // Ekip üyelerini yeniden yükle
-    setTeamMembers(loadTeamMembersFromStorage());
-    
-    // Filtreleri uygula
-    applyFilters(searchQuery, selectedDepartment);
-    
-    // Onay bekleyen kullanıcıları yeniden yükle
-    loadPendingApprovalUsers();
+  const handleUsersUpdated = async () => {
+    try {
+      console.log('TeamPage: Kullanıcı güncellemesi algılandı, veriler yenileniyor...');
+      
+      // Ekip üyelerini yeniden yükle
+      setTeamMembers(loadTeamMembersFromStorage());
+      
+      // Filtreleri uygula
+      applyFilters(searchQuery, selectedDepartment);
+      
+      // Onay bekleyen kullanıcıları yeniden yükle
+      await loadPendingApprovalUsers();
+      
+      console.log('TeamPage: Kullanıcı güncellemesi tamamlandı');
+    } catch (error) {
+      console.error('TeamPage: Kullanıcı güncellemesi sırasında hata:', error);
+    }
   };
   
   // Kullanıcı değişikliklerini dinle
@@ -240,25 +259,37 @@ export default function TeamPage() {
   };
   
   // Onay bekleyen kullanıcı olduğunda bildirim
-  const handleUserApprovalRequested = () => {
-    loadPendingApprovalUsers();
-    
-    notificationService.showNotification(
-      'Yeni bir kullanıcı onay bekliyor',
-      NotificationType.INFO
-    );
+  const handleUserApprovalRequested = async () => {
+    try {
+      console.log('TeamPage: Yeni kullanıcı onay talebi algılandı');
+      await loadPendingApprovalUsers();
+      
+      notificationService.showNotification(
+        'Yeni bir kullanıcı onay bekliyor',
+        NotificationType.INFO
+      );
+    } catch (error) {
+      console.error('TeamPage: Onay bekleyen kullanıcıları yüklerken hata:', error);
+    }
   };
   
   // Onay bekleyen kullanıcıları yükle
-  const loadPendingApprovalUsers = () => {
-    const pendingUsers = getPendingApprovalUsers();
-    setPendingApprovalUsers(pendingUsers);
+  const loadPendingApprovalUsers = async () => {
+    try {
+      console.log('TeamPage: Onay bekleyen kullanıcılar yükleniyor...');
+      const pendingUsers = await getPendingApprovalUsers();
+      console.log(`TeamPage: ${pendingUsers?.length || 0} onay bekleyen kullanıcı bulundu`);
+      setPendingApprovalUsers(pendingUsers || []);
+    } catch (error) {
+      console.error('TeamPage: Onay bekleyen kullanıcılar yüklenirken hata:', error);
+      setPendingApprovalUsers([]);
+    }
   };
   
   // Not: Giriş yapma özelliği kaldırıldı
   
   // Kullanıcıyı onayla
-  const handleApproveUser = (userId: number) => {
+  const handleApproveUser = async (userId: number) => {
     if (!currentUser) {
       notificationService.showNotification(
         'Kullanıcı onaylamak için giriş yapmalısınız',
@@ -267,26 +298,37 @@ export default function TeamPage() {
       return;
     }
     
-    const success = approveUser(userId, currentUser.id);
-    
-    if (success) {
-      notificationService.showNotification(
-        'Kullanıcı başarıyla onaylandı',
-        NotificationType.SUCCESS
-      );
+    try {
+      console.log(`TeamPage: Kullanıcı onaylama işlemi başlatılıyor. UserId: ${userId}`);
+      const success = await approveUser(userId, currentUser.id);
       
-      // Onay bekleyen kullanıcıları yeniden yükle
-      loadPendingApprovalUsers();
-    } else {
+      if (success) {
+        console.log('TeamPage: Kullanıcı başarıyla onaylandı');
+        notificationService.showNotification(
+          'Kullanıcı başarıyla onaylandı',
+          NotificationType.SUCCESS
+        );
+        
+        // Onay bekleyen kullanıcıları yeniden yükle
+        await loadPendingApprovalUsers();
+      } else {
+        console.error('TeamPage: Kullanıcı onaylama işlemi başarısız oldu');
+        notificationService.showNotification(
+          'Kullanıcı onaylanırken bir hata oluştu',
+          NotificationType.ERROR
+        );
+      }
+    } catch (error) {
+      console.error('TeamPage: Kullanıcı onaylama işlemi sırasında hata:', error);
       notificationService.showNotification(
-        'Kullanıcı onaylanırken bir hata oluştu',
+        'Kullanıcı onaylama işlemi sırasında bir hata oluştu',
         NotificationType.ERROR
       );
     }
   };
   
   // Kullanıcı onayını reddet
-  const handleRejectUser = (userId: number) => {
+  const handleRejectUser = async (userId: number) => {
     if (!currentUser) {
       notificationService.showNotification(
         'Kullanıcı reddetmek için giriş yapmalısınız',
@@ -295,19 +337,30 @@ export default function TeamPage() {
       return;
     }
     
-    const success = rejectUser(userId, currentUser.id);
-    
-    if (success) {
-      notificationService.showNotification(
-        'Kullanıcı reddedildi',
-        NotificationType.SUCCESS
-      );
+    try {
+      console.log(`TeamPage: Kullanıcı reddetme işlemi başlatılıyor. UserId: ${userId}`);
+      const success = await rejectUser(userId, currentUser.id);
       
-      // Onay bekleyen kullanıcıları yeniden yükle
-      loadPendingApprovalUsers();
-    } else {
+      if (success) {
+        console.log('TeamPage: Kullanıcı başarıyla reddedildi');
+        notificationService.showNotification(
+          'Kullanıcı reddedildi',
+          NotificationType.SUCCESS
+        );
+        
+        // Onay bekleyen kullanıcıları yeniden yükle
+        await loadPendingApprovalUsers();
+      } else {
+        console.error('TeamPage: Kullanıcı reddetme işlemi başarısız oldu');
+        notificationService.showNotification(
+          'Kullanıcı reddedilirken bir hata oluştu',
+          NotificationType.ERROR
+        );
+      }
+    } catch (error) {
+      console.error('TeamPage: Kullanıcı reddetme işlemi sırasında hata:', error);
       notificationService.showNotification(
-        'Kullanıcı reddedilirken bir hata oluştu',
+        'Kullanıcı reddetme işlemi sırasında bir hata oluştu',
         NotificationType.ERROR
       );
     }

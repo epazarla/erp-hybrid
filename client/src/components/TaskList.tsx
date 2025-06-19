@@ -108,7 +108,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, users, onTasksChanged }) => 
   const handleStatusChange = async (taskId: number, newStatus: string) => {
     try {
       setLoading(true);
-      const updatedTask = updateTask(taskId, { status: newStatus });
+      const updatedTask = await updateTask(taskId, { status: newStatus });
       if (updatedTask) {
         setSnackbar({ 
           open: true, 
@@ -141,16 +141,16 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, users, onTasksChanged }) => 
     setDeleteDialogOpen(false);
   };
 
-  // Görevi sil
-  const handleDeleteTask = async () => {
-    if (!taskToDelete) return;
+  // Görev silme işlemi
+  const handleDelete = async () => {
+    if (taskToDelete === null) return;
     
     try {
       setLoading(true);
       console.log(`[${new Date().toISOString()}] Görev siliniyor, ID: ${taskToDelete}`);
       
       // Önce görevi getir ve sakla (geri almak için)
-      const taskToSave = getTaskById(taskToDelete);
+      const taskToSave = await getTaskById(taskToDelete);
       if (!taskToSave) {
         console.error(`[${new Date().toISOString()}] Silinecek görev bulunamadı, ID: ${taskToDelete}`);
         setSnackbar({ 
@@ -162,7 +162,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, users, onTasksChanged }) => 
       }
       
       // Görevi sil
-      const deleted = deleteTask(taskToDelete);
+      const deleted = await deleteTask(taskToDelete);
       if (deleted) {
         // Silinen görevi sakla
         setDeletedTask(taskToSave);
@@ -201,14 +201,14 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, users, onTasksChanged }) => 
   };
   
   // Silinen görevi geri al
-  const handleUndoDelete = () => {
+  const handleUndoDelete = async () => {
     if (!deletedTask) return;
     
     try {
       setLoading(true);
       
       // Görevi geri al
-      const restoredTask = restoreTask(deletedTask.id);
+      const restoredTask = await restoreTask(deletedTask.id);
       
       if (restoredTask) {
         setSnackbar({
@@ -541,7 +541,7 @@ const TaskList: React.FC<TaskListProps> = ({ tasks, users, onTasksChanged }) => 
           <Button onClick={closeDeleteDialog} color="primary">
             İptal
           </Button>
-          <Button onClick={handleDeleteTask} color="error" autoFocus>
+          <Button onClick={handleDelete} color="error" autoFocus>
             Sil
           </Button>
         </DialogActions>

@@ -182,11 +182,18 @@ const RegisterPage: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      // Şifre alanını çıkart (gerçek uygulamada şifre hash'lenerek saklanmalıdır)
-      const { confirmPassword, password, ...userData } = formData;
+      // Şifre alanını çıkart ve bcrypt ile hash'le
+      const { confirmPassword, ...userData } = formData;
       
       // Kullanıcı kaydını oluştur
-      const newUser = registerUser(userData);
+      const newUser = await registerUser({
+        ...userData,
+        username: userData.email.split('@')[0], // E-posta adresinden kullanıcı adı oluştur
+        is_admin: false, // Varsayılan olarak admin değil
+        is_active: false, // Varsayılan olarak aktif değil
+        status: 'pending_approval', // Onay bekliyor durumu
+        password: userData.password // Şifre hash'leme işlemi Supabase fonksiyonunda yapılıyor
+      });
       
       if (newUser) {
         setRegisteredUserId(newUser.id);
@@ -203,7 +210,7 @@ const RegisterPage: React.FC = () => {
         // Hata mesajı göster
         setSnackbar({
           open: true,
-          message: 'Kayıt oluşturulurken bir hata oluştu.',
+          message: 'Kayıt oluşturulurken bir hata oluştu. E-posta adresi zaten kullanılıyor olabilir.',
           severity: 'error'
         });
       }
@@ -222,32 +229,43 @@ const RegisterPage: React.FC = () => {
   // Onay durumunu kontrol et
   useEffect(() => {
     if (registeredUserId) {
-      const checkApprovalStatus = () => {
-        const status = checkUserApprovalStatus(registeredUserId);
+      const checkApprovalStatus = async () => {
+        if (!registeredUserId) return;
         
-        if (status === 'approved') {
+        try {
+          const status = await checkUserApprovalStatus(registeredUserId);
+          
+          if (status === 'approved') {
+            setSnackbar({
+              open: true,
+              message: 'Hesabınız onaylandı! Giriş yapabilirsiniz.',
+              severity: 'success'
+            });
+            
+            // Onay diyaloğunu kapat
+            setApprovalDialogOpen(false);
+            
+            // Giriş sayfasına yönlendir
+            setTimeout(() => {
+              navigate('/login');
+            }, 2000);
+          } else if (status === 'rejected') {
+            setSnackbar({
+              open: true,
+              message: 'Hesap başvurunuz reddedildi.',
+              severity: 'error'
+            });
+            
+            // Onay diyaloğunu kapat
+            setApprovalDialogOpen(false);
+          }
+        } catch (error) {
+          console.error('Onay durumu kontrolü sırasında hata:', error);
           setSnackbar({
             open: true,
-            message: 'Hesabınız onaylandı! Giriş yapabilirsiniz.',
-            severity: 'success'
-          });
-          
-          // Onay diyaloğunu kapat
-          setApprovalDialogOpen(false);
-          
-          // Giriş sayfasına yönlendir
-          setTimeout(() => {
-            navigate('/login');
-          }, 2000);
-        } else if (status === 'rejected') {
-          setSnackbar({
-            open: true,
-            message: 'Hesap başvurunuz reddedildi.',
+            message: 'Onay durumu kontrol edilirken bir hata oluştu.',
             severity: 'error'
           });
-          
-          // Onay diyaloğunu kapat
-          setApprovalDialogOpen(false);
         }
       };
       

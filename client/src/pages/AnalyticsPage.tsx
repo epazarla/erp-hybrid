@@ -155,13 +155,15 @@ export default function AnalyticsPage() {
   }, [department, clients, tasks, users]);
   
   // Tüm verileri yükle
-  const loadData = () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       
-      const allTasks = getAllTasks();
-      const activeUsers = getActiveUsers();
-      const allClients = getAllClients(true); // Sadece aktif müşteriler
+      const [allTasks, activeUsers, allClients] = await Promise.all([
+        getAllTasks(),
+        getActiveUsers(),
+        getAllClients(true) // Sadece aktif müşteriler
+      ]);
       
       setTasks(allTasks);
       setUsers(activeUsers);
@@ -175,9 +177,9 @@ export default function AnalyticsPage() {
       generateClientDistributionData(allClients);
       generateTeamPerformanceData(allTasks, activeUsers);
       
-      setLoading(false);
     } catch (error) {
       console.error('Analitik verileri yüklenirken hata oluştu:', error);
+    } finally {
       setLoading(false);
     }
   };

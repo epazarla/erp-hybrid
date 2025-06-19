@@ -34,6 +34,7 @@ import {
   Task, 
   getAllTasks,
   getAllTasksAndNotify,
+  updateTaskCompletionStats,
   TASK_STATUS_LABELS,
   TASK_STATUSES as SERVICE_TASK_STATUSES, 
   TASKS_UPDATED_EVENT,
@@ -98,49 +99,126 @@ export default function DashboardPage() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        console.log('Dashboard: Veri yükleme başlatılıyor...');
         setLoading(true);
         setError(null);
 
-        // Görevleri yükle
-        const allTasks = await getAllTasks();
-        setTasks(allTasks);
+        // Görevleri yükle - hata durumunda boş dizi kullan
+        let allTasks: Task[] = [];
+        try {
+          console.log('Dashboard: Görevler yükleniyor...');
+          allTasks = await getAllTasks();
+          console.log(`Dashboard: ${allTasks.length} görev yüklendi`);
+          setTasks(allTasks);
+        } catch (taskError) {
+          console.error('Dashboard: Görevler yüklenirken hata:', taskError);
+          allTasks = [];
+          setTasks([]);
+        }
 
         // Tamamlanma oranını hesapla
         if (allTasks.length > 0) {
           const completedCount = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED).length;
           const rate = Math.round((completedCount / allTasks.length) * 100);
           setTaskCompletionRate(rate);
+        } else {
+          setTaskCompletionRate(0);
         }
 
         // Görev durumlarına göre ayır
-        const completed = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED);
-        const pending = allTasks.filter((task: Task) => 
-          task.status === TASK_STATUSES.IN_PROGRESS || 
-          task.status === TASK_STATUSES.PENDING
-        );
-        const overdue = allTasks.filter((task: Task) => {
-          if (!task.due_date) return false;
-          const dueDate = parseISO(task.due_date);
-          const today = new Date();
-          return differenceInDays(today, dueDate) > 0 && task.status !== TASK_STATUSES.COMPLETED;
-        });
+        try {
+          console.log('Dashboard: Görevler filtreleniyor...');
+          
+          // Boş görev listesi kontrolü
+          if (!allTasks || allTasks.length === 0) {
+            console.log('Dashboard: Filtrelenecek görev yok');
+            setCompletedTasks([]);
+            setPendingTasks([]);
+            setOverdueTasks([]);
+            return;
+          }
+          
+          const completed = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED);
+          console.log(`Dashboard: ${completed.length} tamamlanmış görev bulundu`);
+          
+          const pending = allTasks.filter((task: Task) => 
+            task.status === TASK_STATUSES.IN_PROGRESS || 
+            task.status === TASK_STATUSES.PENDING
+          );
+          console.log(`Dashboard: ${pending.length} bekleyen görev bulundu`);
+          
+          const overdue = allTasks.filter((task: Task) => {
+            if (!task.due_date) return false;
+            try {
+              const dueDate = parseISO(task.due_date);
+              const today = new Date();
+              return differenceInDays(today, dueDate) > 0 && task.status !== TASK_STATUSES.COMPLETED;
+            } catch (dateError) {
+              console.error('Dashboard: Tarih işleme hatası:', dateError, task);
+              return false;
+            }
+          });
+          console.log(`Dashboard: ${overdue.length} gecikmiş görev bulundu`);
 
-        setCompletedTasks(completed);
-        setPendingTasks(pending);
-        setOverdueTasks(overdue);
+          setCompletedTasks(completed);
+          setPendingTasks(pending);
+          setOverdueTasks(overdue);
+        } catch (filterError) {
+          console.error('Dashboard: Görev filtreleme hatası:', filterError);
+          setCompletedTasks([]);
+          setPendingTasks([]);
+          setOverdueTasks([]);
+        }
 
         // Aktif kullanıcıları yükle
-        const users = getActiveUsers();
-        setActiveUsers(users);
+        try {
+          console.log('Dashboard: Aktif kullanıcılar yükleniyor...');
+          const users = await getActiveUsers();
+          console.log(`Dashboard: ${users?.length || 0} aktif kullanıcı yüklendi`);
+          setActiveUsers(users || []);
+        } catch (userError) {
+          console.error('Dashboard: Kullanıcılar yüklenirken hata:', userError);
+          // Boş dizi ile devam et
+          setActiveUsers([]);
+        }
 
         // Müşterileri yükle
-        const allClients = await getAllClients();
-        setClients(allClients);
+        try {
+          console.log('Dashboard: Müşteriler yükleniyor...');
+          const allClients = await getAllClients();
+          console.log(`Dashboard: ${allClients?.length || 0} müşteri yüklendi`);
+          setClients(allClients || []);
+        } catch (clientError) {
+          console.error('Dashboard: Müşteriler yüklenirken hata:', clientError);
+          // Boş dizi ile devam et
+          setClients([]);
+        }
 
+        // Yükleme tamamlandı
+        console.log('Dashboard: Tüm veriler başarıyla yüklendi');
         setLoading(false);
-      } catch (err) {
-        console.error('Veri yükleme hatası:', err);
-        setError('Veriler yüklenirken bir hata oluştu.');
+        
+        // Başarılı yükleme sonrası event'leri tetikle
+        try {
+          // Görev istatistiklerini güncelle
+          await updateTaskCompletionStats('dashboard-auto', allTasks);
+        } catch (statsError) {
+          console.error('Dashboard: İstatistik güncellemesi sırasında hata:', statsError);
+        }
+        
+      } catch (err: any) {
+        console.error('Dashboard: Veri yükleme hatası:', err?.message || err);
+        console.error('Hata detayları:', err);
+        
+        setError('Veriler yüklenirken bir hata oluştu. Lütfen sayfayı yenileyin.');
+        
+        // Boş verilerle devam et
+        setTasks([]);
+        setCompletedTasks([]);
+        setPendingTasks([]);
+        setOverdueTasks([]);
+        setActiveUsers([]);
+        setClients([]);
         setLoading(false);
       }
     };
@@ -149,105 +227,159 @@ export default function DashboardPage() {
 
     // Görev güncellemelerini dinle
     const handleTasksUpdated = () => {
-      loadData();
+      try {
+        loadData();
+      } catch (error) {
+        console.error('Görev güncelleme olayı işlenirken hata:', error);
+        setError('Görev verileri güncellenirken bir hata oluştu.');
+      }
     };
     
     // Görev tamamlama istatistiklerini dinle
     const handleTaskCompletionUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const stats = customEvent.detail;
-      console.log('Dashboard: Görev tamamlama istatistikleri güncellendi', stats);
-      setTaskStats(stats);
-      setLastUpdate(new Date());
-      
-      // İstatistiklere göre görev durumlarını güncelle
-      if (stats && stats.completionRate !== undefined) {
-        setTaskCompletionRate(stats.completionRate);
+      try {
+        const customEvent = event as CustomEvent;
+        const stats = customEvent.detail;
+        console.log('Dashboard: Görev tamamlama istatistikleri güncellendi', stats);
+        
+        if (stats) {
+          setTaskStats(stats);
+          setLastUpdate(new Date());
+          
+          // İstatistiklere göre görev durumlarını güncelle
+          if (stats.completionRate !== undefined) {
+            setTaskCompletionRate(stats.completionRate);
+          }
+        }
+      } catch (error) {
+        console.error('Görev tamamlama istatistikleri işlenirken hata:', error);
       }
     };
     
     // Yaklaşan görevleri dinle
     const handleUpcomingTasksUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const upcomingTasksData = customEvent.detail?.tasks;
-      console.log('Dashboard: Yaklaşan görevler güncellendi', upcomingTasksData);
-      if (upcomingTasksData && Array.isArray(upcomingTasksData)) {
-        setUpcomingTasks(upcomingTasksData);
-        setLastUpdate(new Date());
+      try {
+        const customEvent = event as CustomEvent;
+        const upcomingTasksData = customEvent.detail?.tasks;
+        console.log('Dashboard: Yaklaşan görevler güncellendi', upcomingTasksData);
+        
+        if (upcomingTasksData && Array.isArray(upcomingTasksData)) {
+          setUpcomingTasks(upcomingTasksData);
+          setLastUpdate(new Date());
+        } else {
+          // Veri yoksa veya geçersizse boş dizi kullan
+          console.warn('Yaklaşan görevler verisi geçersiz format:', upcomingTasksData);
+          setUpcomingTasks([]);
+        }
+      } catch (error) {
+        console.error('Yaklaşan görevler güncellenirken hata:', error);
+        setUpcomingTasks([]);
       }
     };
     
     // Son görevleri dinle
     const handleRecentTasksUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const recentTasksData = customEvent.detail?.tasks;
-      console.log('Dashboard: Son görevler güncellendi', recentTasksData);
-      if (recentTasksData && Array.isArray(recentTasksData)) {
-        setTasks(recentTasksData);
-        setLastUpdate(new Date());
+      try {
+        const customEvent = event as CustomEvent;
+        const recentTasksData = customEvent.detail?.tasks;
+        console.log('Dashboard: Son görevler güncellendi', recentTasksData);
+        
+        if (recentTasksData && Array.isArray(recentTasksData)) {
+          setTasks(recentTasksData);
+          setLastUpdate(new Date());
+        } else {
+          // Veri yoksa veya geçersizse boş dizi kullan
+          console.warn('Son görevler verisi geçersiz format:', recentTasksData);
+        }
+      } catch (error) {
+        console.error('Son görevler güncellenirken hata:', error);
       }
     };
     
     // Görev durumu güncellemelerini dinle
     const handleTaskStatusUpdate = async (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const statusData = customEvent.detail;
-      console.log('Dashboard: Görev durumu güncellendi', statusData);
-      setLastUpdate(new Date());
-      
-      // Görev durumu güncellemesi sonrası gerekli verileri yenile
-      const allTasks = await getAllTasks();
-      setTasks(allTasks);
+      try {
+        const customEvent = event as CustomEvent;
+        const statusData = customEvent.detail;
+        console.log('Dashboard: Görev durumu güncellendi', statusData);
+        setLastUpdate(new Date());
         
-        // Görevleri durumlara göre filtrele
-        const completed = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED);
-        const pending = allTasks.filter((task: Task) => task.status === TASK_STATUSES.PENDING);
+        // Görev durumu güncellemesi sonrası gerekli verileri yenile
+        try {
+          const allTasks = await getAllTasks();
+          setTasks(allTasks);
+          
+          // Görevleri durumlara göre filtrele
+          const completed = allTasks.filter((task: Task) => task.status === TASK_STATUSES.COMPLETED);
+          const pending = allTasks.filter((task: Task) => task.status === TASK_STATUSES.PENDING);
+          
+          // Gecikmiş görevleri hesapla
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const overdue = allTasks.filter((task: Task) => {
+            if (!task.due_date) return false;
+            try {
+              const dueDate = new Date(task.due_date);
+              dueDate.setHours(0, 0, 0, 0);
+              return differenceInDays(today, dueDate) > 0 && task.status !== TASK_STATUSES.COMPLETED;
+            } catch (dateError) {
+              console.error('Tarih işleme hatası:', dateError, task);
+              return false;
+            }
+          });
         
-        // Gecikmiş görevleri hesapla
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const overdue = allTasks.filter((task: Task) => {
-          const dueDate = new Date(task.due_date);
-          dueDate.setHours(0, 0, 0, 0);
-          return differenceInDays(today, dueDate) > 0 && task.status !== TASK_STATUSES.COMPLETED;
-        });
-      
-      setCompletedTasks(completed);
-      setPendingTasks(pending);
-      setOverdueTasks(overdue);
+          setCompletedTasks(completed);
+          setPendingTasks(pending);
+          setOverdueTasks(overdue);
+        } catch (tasksError) {
+          console.error('Görev durumu güncellenirken hata oluştu:', tasksError);
+          // Hata durumunda boş dizilerle devam et
+          setTasks([]);
+          setCompletedTasks([]);
+          setPendingTasks([]);
+          setOverdueTasks([]);
+        }
+      } catch (error) {
+        console.error('Görev durumu güncelleme olayı işlenirken hata:', error);
+      }
     };
     
     // Tüm widget'ları güncelleme olayını dinle
-    const handleTaskWidgetUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const widgetData = customEvent.detail;
-      console.log('Dashboard: Tüm widget verileri güncellendi', widgetData);
-      
-      if (widgetData) {
-        // Tüm widget verilerini güncelle
-        if (widgetData.completionRate !== undefined) {
-          setTaskCompletionRate(widgetData.completionRate);
-        }
+    const handleTaskWidgetUpdate = async (event: Event) => {
+      try {
+        const customEvent = event as CustomEvent;
+        const widgetData = customEvent.detail;
+        console.log('Dashboard: Tüm widget verileri güncellendi', widgetData);
         
-        if (widgetData.statusCounts) {
-          setTaskStats({
-            completionRate: widgetData.completionRate || 0,
-            counts: widgetData.statusCounts,
-            totalTasks: widgetData.tasks?.length || 0,
-            completedTasks: widgetData.tasks?.filter((t: Task) => t.status === 'completed').length || 0,
-            timestamp: widgetData.timestamp
-          });
+        if (widgetData) {
+          // Tüm widget verilerini güncelle
+          if (widgetData.completionRate !== undefined) {
+            setTaskCompletionRate(widgetData.completionRate);
+          }
+          
+          if (widgetData.statusCounts) {
+            setTaskStats({
+              completionRate: widgetData.completionRate || 0,
+              counts: widgetData.statusCounts,
+              totalTasks: widgetData.tasks?.length || 0,
+              completedTasks: widgetData.tasks?.filter((t: Task) => t.status === 'completed').length || 0,
+              timestamp: widgetData.timestamp
+            });
+          }
+          
+          if (widgetData.upcomingTasks && Array.isArray(widgetData.upcomingTasks)) {
+            setUpcomingTasks(widgetData.upcomingTasks);
+          }
+          
+          if (widgetData.recentTasks && Array.isArray(widgetData.recentTasks)) {
+            setTasks(widgetData.recentTasks);
+          }
+          
+          setLastUpdate(new Date());
         }
-        
-        if (widgetData.upcomingTasks && Array.isArray(widgetData.upcomingTasks)) {
-          setUpcomingTasks(widgetData.upcomingTasks);
-        }
-        
-        if (widgetData.recentTasks && Array.isArray(widgetData.recentTasks)) {
-          setTasks(widgetData.recentTasks);
-        }
-        
-        setLastUpdate(new Date());
+      } catch (error) {
+        console.error('Widget güncellenirken hata oluştu:', error);
+        setError('Widget verileri güncellenirken bir hata oluştu.');
       }
     };
 
@@ -259,7 +391,11 @@ export default function DashboardPage() {
     window.addEventListener(TASK_WIDGET_UPDATE_EVENT, handleTaskWidgetUpdate);
     
     // Başlangıçta tüm görev verilerini ve olayları tetikle
-    getAllTasksAndNotify('dashboard-init');
+    try {
+      getAllTasksAndNotify('dashboard-init');
+    } catch (error) {
+      console.error('Başlangıç görev yüklemesi sırasında hata:', error);
+    }
     
     // Cleanup
     return () => {

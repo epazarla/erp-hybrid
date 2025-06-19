@@ -18,9 +18,10 @@ import {
   Tooltip,
   ListItemIcon,
   ListItemText,
-  Chip
+  Chip,
+  ButtonBase
 } from '@mui/material';
-import { Link as RouterLink } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useLocation } from 'react-router-dom';
 import {
   Dashboard as DashboardIcon,
   Assignment as TaskIcon,
@@ -44,47 +45,84 @@ import { styled, alpha } from '@mui/material/styles';
 const Main = styled('main')(({ theme }) => ({
   flexGrow: 1,
   padding: theme.spacing(3),
-  paddingTop: theme.spacing(10),
+  paddingTop: theme.spacing(14), // Daha büyük üst çubuk için padding artırıldı
   width: '100%',
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'flex-start',
-  minHeight: 'calc(100vh - 64px)', // Üst çubuk yüksekliğini çıkar
+  minHeight: 'calc(100vh - 110px)', // Apple tarzı daha yüksek üst çubuk için güncellendi
 }));
 
-// Modern menü tab butonu
-const MenuTab = styled(Tab)(({ theme }) => ({
-  minHeight: 64,
-  textTransform: 'none',
-  fontWeight: 500,
-  fontSize: '0.9rem',
-  color: theme.palette.text.secondary,
-  padding: '6px 16px',
+// İkon kapsayıcısı
+const IconContainer = styled('div')(({ theme }) => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '48px',
+  height: '48px',
   borderRadius: '12px',
-  margin: '0 6px',
-  transition: 'all 0.2s ease-in-out',
+  marginBottom: '8px',
+  transition: 'all 0.3s ease',
+  backgroundColor: alpha(theme.palette.background.paper, 0.8),
+  boxShadow: `0 4px 8px ${alpha(theme.palette.common.black, 0.08)}`,
+}));
+
+// Modern menü butonu
+const MenuButton = styled('button')(({ theme }) => ({
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '12px',
+  borderRadius: '16px',
+  minWidth: '100px',
+  height: '80px',
+  margin: '0 8px',
+  transition: 'all 0.25s ease',
+  position: 'relative',
+  overflow: 'hidden',
+  backgroundColor: 'transparent',
+  border: 'none',
+  cursor: 'pointer',
+  outline: 'none',
   '&:hover': {
-    backgroundColor: alpha(theme.palette.primary.main, 0.04),
+    backgroundColor: alpha(theme.palette.background.paper, 0.6),
     transform: 'translateY(-2px)',
-    boxShadow: `0 4px 8px -2px ${alpha(theme.palette.primary.main, 0.15)}`,
   },
-  '&.Mui-selected': {
-    color: theme.palette.primary.main,
-    fontWeight: 600,
-    backgroundColor: alpha(theme.palette.primary.main, 0.08),
-    boxShadow: `0 4px 10px -2px ${alpha(theme.palette.primary.main, 0.2)}`,
+  '&::before': {
+    content: '""',
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
+    borderRadius: 'inherit',
+    transition: 'opacity 0.3s ease',
+    opacity: 0,
+    background: `linear-gradient(135deg, ${alpha(theme.palette.primary.main, 0.2)}, ${alpha(theme.palette.secondary.main, 0.2)})`,
   },
-  '& .MuiTab-iconWrapper': {
-    marginBottom: 4,
-    padding: '8px',
+  '&:hover::before': {
+    opacity: 1,
   },
-  '& .MuiSvgIcon-root': {
-    fontSize: '1.2rem',
-    transition: 'transform 0.2s ease',
+}));
+
+// Seçili menü butonu için özel stil
+const SelectedMenuButton = styled(MenuButton)(({ theme }) => ({
+  backgroundColor: alpha(theme.palette.background.paper, 0.8),
+  boxShadow: `0 8px 16px -4px ${alpha(theme.palette.primary.main, 0.2)}`,
+  '&::after': {
+    content: '""',
+    position: 'absolute',
+    bottom: 0,
+    left: '20%',
+    right: '20%',
+    height: '3px',
+    borderRadius: '3px',
+    background: `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`,
   },
-  '&.Mui-selected .MuiSvgIcon-root': {
-    color: theme.palette.primary.main,
-    transform: 'scale(1.2)',
+  '&:hover': {
+    transform: 'translateY(-2px)',
   },
 }));
 
@@ -108,6 +146,7 @@ interface DashboardLayoutProps {
     role?: string;
     id?: number;
     avatar?: string;
+    isAdmin?: boolean;
   };
   onPageChange?: (page: string) => void;
   onThemeToggle?: () => void;
@@ -115,76 +154,95 @@ interface DashboardLayoutProps {
   currentPath?: string;
 }
 
+// Modern menü öğeleri
 const menuItems = [
-  { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard', value: 'dashboard' },
-  { text: 'Görevler', icon: <TaskIcon />, path: '/tasks', value: 'tasks' },
-  { text: 'Ekip', icon: <PeopleIcon />, path: '/team', value: 'team' },
-  { text: 'Müşteriler', icon: <BusinessIcon />, path: '/clients', value: 'clients' },
-  { text: 'Analitik', icon: <AnalyticsIcon />, path: '/analytics', value: 'analytics' },
-  { text: 'Ayarlar', icon: <SettingsIcon />, path: '/settings', value: 'settings' },
+  { 
+    text: 'Dashboard', 
+    icon: <DashboardIcon sx={{ fontSize: '1.8rem' }} />, 
+    path: '/dashboard', 
+    value: 'dashboard',
+    color: '#2196f3', // Mavi
+    gradient: 'linear-gradient(135deg, #2196f3, #21cbf3)'
+  },
+  { 
+    text: 'Görevler', 
+    icon: <TaskIcon sx={{ fontSize: '1.8rem' }} />, 
+    path: '/tasks', 
+    value: 'tasks',
+    color: '#4caf50', // Yeşil
+    gradient: 'linear-gradient(135deg, #4caf50, #8bc34a)'
+  },
+  { 
+    text: 'Ekip', 
+    icon: <PeopleIcon sx={{ fontSize: '1.8rem' }} />, 
+    path: '/team', 
+    value: 'team',
+    color: '#ff9800', // Turuncu
+    gradient: 'linear-gradient(135deg, #ff9800, #ffb74d)'
+  },
+  { 
+    text: 'Müşteriler', 
+    icon: <BusinessIcon sx={{ fontSize: '1.8rem' }} />, 
+    path: '/clients', 
+    value: 'clients',
+    color: '#9c27b0', // Mor
+    gradient: 'linear-gradient(135deg, #9c27b0, #ba68c8)'
+  },
+  { 
+    text: 'Analitik', 
+    icon: <AnalyticsIcon sx={{ fontSize: '1.8rem' }} />, 
+    path: '/analytics', 
+    value: 'analytics',
+    color: '#f44336', // Kırmızı
+    gradient: 'linear-gradient(135deg, #f44336, #e57373)'
+  },
+  { 
+    text: 'Ayarlar', 
+    icon: <SettingsIcon sx={{ fontSize: '1.8rem' }} />, 
+    path: '/settings', 
+    value: 'settings',
+    color: '#607d8b', // Gri-mavi
+    gradient: 'linear-gradient(135deg, #607d8b, #90a4ae)'
+  },
+  { 
+    text: 'Admin Panel', 
+    icon: <SecurityIcon sx={{ fontSize: '1.8rem' }} />, 
+    path: '/admin', 
+    value: 'admin',
+    color: '#d32f2f', // Kırmızı
+    gradient: 'linear-gradient(135deg, #d32f2f, #ff5722)',
+    adminOnly: true // Sadece admin kullanıcılar için
+  },
 ];
 
-export default function DashboardLayout({ 
-  children, 
-  onLogout, 
-  user, 
-  onPageChange, 
-  onThemeToggle, 
-  darkMode: propDarkMode = false,
-  currentPath = '/dashboard'
-}: DashboardLayoutProps) {
+const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children, currentPath, onThemeToggle, darkMode, user, onLogout, onPageChange }) => {
   const theme = useTheme();
-  const darkMode = propDarkMode;
-  
-  // Seçili sekme
+  const location = useLocation();
+  const navigate = useNavigate();
   const [selectedTab, setSelectedTab] = useState(0);
-  
-  // Menü durumları
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<null | HTMLElement>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
   const [isNotificationsMenuOpen, setIsNotificationsMenuOpen] = useState(false);
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [notificationsAnchorEl, setNotificationsAnchorEl] = useState<null | HTMLElement>(null);
-  
-  // Bildirimler
-  const [notifications, setNotifications] = useState([
-    {
-      id: 1,
-      type: 'info',
-      message: 'Yeni görev oluşturuldu',
-      time: '10 dakika önce',
-      read: false
-    },
-    {
-      id: 2,
-      type: 'success',
-      message: 'Görev tamamlandı',
-      time: '1 saat önce',
-      read: false
-    }
-  ]);
-  
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
   // Tema değiştirme
   const handleThemeToggle = () => {
     if (onThemeToggle) {
       onThemeToggle();
     }
   };
-  
-  // Sekme değiştirme
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+
+  // Tab değişikliği işleyicisi
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setSelectedTab(newValue);
-    
-    if (onPageChange) {
-      onPageChange(menuItems[newValue].path);
+    // Seçilen sekmeye yönlendirme
+    const selectedItem = menuItems[newValue];
+    if (selectedItem && selectedItem.path) {
+      navigate(selectedItem.path);
     }
-  };
-  
-  // Tüm menüleri kapat
-  const handleCloseAllMenus = () => {
-    setAnchorEl(null);
-    setIsProfileMenuOpen(false);
-    setIsNotificationsMenuOpen(false);
-    setNotificationsAnchorEl(null);
   };
   
   // Profil menüsünü aç
@@ -212,6 +270,14 @@ export default function DashboardLayout({
   // Bildirimler menüsünü kapat
   const handleNotificationsMenuClose = () => {
     setNotificationsAnchorEl(null);
+    setIsNotificationsMenuOpen(false);
+  };
+  
+  // Tüm menüleri kapat
+  const handleCloseAllMenus = () => {
+    setAnchorEl(null);
+    setNotificationsAnchorEl(null);
+    setIsProfileMenuOpen(false);
     setIsNotificationsMenuOpen(false);
   };
   
@@ -503,17 +569,24 @@ export default function DashboardLayout({
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         <CssBaseline />
         
-        {/* Üst Çubuk */}
+        {/* Apple Tarzı Üst Çubuk */}
         <AppBar 
           position="fixed" 
           sx={{ 
             zIndex: theme.zIndex.drawer + 1,
-            backgroundColor: alpha(theme.palette.background.default, 0.8),
-            backdropFilter: 'blur(8px)',
-            boxShadow: `0 2px 10px ${alpha(theme.palette.common.black, 0.1)}`,
+            backgroundColor: alpha(theme.palette.background.default, 0.85),
+            backdropFilter: 'blur(12px)',
+            boxShadow: `0 4px 20px ${alpha(theme.palette.common.black, 0.08)}`,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.08)}`,
+            height: 110, // Apple tarzı daha yüksek üst çubuk
           }}
         >
-          <Toolbar sx={{ minHeight: 64, px: { xs: 2, sm: 3 } }}>
+          <Toolbar sx={{ 
+            minHeight: 110, 
+            px: { xs: 2, sm: 3 },
+            display: 'flex',
+            alignItems: 'center',
+          }}>
             {/* Logo ve Başlık */}
             <Box sx={{ 
               display: 'flex', 
@@ -567,31 +640,102 @@ export default function DashboardLayout({
               </Typography>
             </Box>
             
-            {/* Menü Sekmeleri */}
-            <Tabs 
-              value={selectedTab} 
+            {/* Apple Tarzı Menü */}
+            <Tabs
+              value={selectedTab}
               onChange={handleTabChange}
               variant="scrollable"
               scrollButtons="auto"
-              sx={{ 
+              aria-label="dashboard menu tabs"
+              sx={{
                 flex: 1,
-                '& .MuiTabs-indicator': {
-                  display: 'none',
-                },
+                minHeight: '60px',
                 '& .MuiTabs-flexContainer': {
-                  justifyContent: { xs: 'center', md: 'flex-start' },
-                }
+                  height: '100%',
+                },
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: '3px',
+                  backgroundColor: theme.palette.primary.main,
+                  boxShadow: `0 0 8px ${alpha(theme.palette.primary.main, 0.5)}`,
+                },
+                '& .MuiTab-root': {
+                  minWidth: '90px',
+                  minHeight: '60px',
+                  padding: '6px 16px',
+                  color: theme.palette.text.secondary,
+                  fontWeight: 500,
+                  fontSize: '0.875rem',
+                  textTransform: 'none',
+                  transition: 'all 0.2s ease',
+                  opacity: 0.7,
+                  '&:hover': {
+                    opacity: 1,
+                    backgroundColor: alpha(theme.palette.background.paper, 0.04),
+                  },
+                  '&.Mui-selected': {
+                    color: theme.palette.primary.main,
+                    fontWeight: 600,
+                    opacity: 1,
+                  },
+                },
               }}
             >
-              {menuItems.map((item, index) => (
-                <MenuTab 
-                  key={item.value} 
-                  label={item.text} 
-                  icon={item.icon} 
-                  value={index}
+              {menuItems
+                .filter(item => !item.adminOnly || (user?.isAdmin === true))
+                .map((item, index) => (
+                <Tab
+                  key={item.text}
+                  label={
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0.5 }}>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: '40px',
+                          height: '40px',
+                          borderRadius: '10px',
+                          background: selectedTab === index 
+                            ? `linear-gradient(135deg, ${item.color}, ${alpha(item.color, 0.8)})` 
+                            : alpha(theme.palette.background.paper, 0.7),
+                          boxShadow: selectedTab === index
+                            ? `0 4px 8px ${alpha(item.color, 0.3)}`
+                            : `0 2px 4px ${alpha(theme.palette.common.black, 0.05)}`,
+                          transition: 'all 0.2s ease',
+                          backdropFilter: 'blur(5px)',
+                          WebkitBackdropFilter: 'blur(5px)',
+                        }}
+                      >
+                        {React.cloneElement(item.icon, {
+                          sx: {
+                            fontSize: '1.5rem',
+                            color: selectedTab === index ? '#fff' : item.color,
+                            transition: 'all 0.2s ease',
+                            filter: selectedTab === index ? 'drop-shadow(0 1px 2px rgba(0,0,0,0.2))' : 'none',
+                          },
+                        })}
+                      </Box>
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontSize: '0.75rem',
+                          fontWeight: selectedTab === index ? 600 : 500,
+                          color: selectedTab === index ? item.color : 'inherit',
+                          transition: 'all 0.2s ease',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {item.text}
+                      </Typography>
+                    </Box>
+                  }
+                  component={RouterLink}
+                  to={item.path}
                   sx={{
-                    opacity: selectedTab === index ? 1 : 0.7,
-                    transform: selectedTab === index ? 'scale(1.05)' : 'scale(1)',
+                    '&.MuiButtonBase-root': {
+                      minWidth: '90px',
+                    }
                   }}
                 />
               ))}
@@ -721,3 +865,5 @@ export default function DashboardLayout({
     </ThemeProvider>
   );
 }
+
+export default DashboardLayout;

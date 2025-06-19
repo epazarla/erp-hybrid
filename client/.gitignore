@@ -24,3 +24,5 @@ dist-ssr
 
 # Keep dist folder for Netlify deployment
 # !dist/
+
+.vercel

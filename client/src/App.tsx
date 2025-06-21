@@ -29,15 +29,23 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    const checkAuth = () => {
-      const user = UserService.getCurrentUser();
-      if (!user) {
-        // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
-        navigate('/login', { replace: true, state: { from: location } });
-      } else {
-        setIsAuthenticated(true);
+    const checkAuth = async () => {
+      try {
+        // localStorage'dan kullanıcı bilgisini kontrol et
+        const userStr = localStorage.getItem(UserService.CURRENT_USER_STORAGE_KEY);
+        if (!userStr) {
+          // Kullanıcı giriş yapmamışsa login sayfasına yönlendir
+          navigate('/login', { replace: true, state: { from: location } });
+        } else {
+          // Kullanıcı bilgisi varsa doğrula
+          setIsAuthenticated(true);
+        }
+      } catch (error) {
+        console.error('Kimlik doğrulama hatası:', error);
+        navigate('/login', { replace: true });
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     checkAuth();
@@ -111,62 +119,82 @@ class ErrorBoundary extends React.Component<{children: ReactNode}, {hasError: bo
 }
 
 // Ana uygulama bileşeni
-function AppContent() {
+const AppContent = () => {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [darkMode, setDarkMode] = useState(false);
-  const [supabaseConnected, setSupabaseConnected] = useState<boolean | null>(null);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
   // Kullanıcı bilgilerini yükle
-  useEffect(() => {
-    console.log('AppContent useEffect çalışıyor...');
-    // Yükleme ekranını göster
-    setLoading(true);
-    
-    // Supabase bağlantısını kontrol et
-    const checkSupabaseConnection = async () => {
-      try {
-        const isConnected = await testSupabaseConnection();
-        setSupabaseConnected(isConnected);
-        
-        if (!isConnected) {
-          console.error('Supabase bağlantısı başarısız. Veriler yüklenemeyebilir.');
-          throw new Error('Veritabanı bağlantısı sağlanamıyor. Lütfen daha sonra tekrar deneyin.');
+  const loadUser = async () => {
+    try {
+      // localStorage'dan kullanıcı bilgisini al
+      const userStr = localStorage.getItem(UserService.CURRENT_USER_STORAGE_KEY);
+      if (userStr) {
+        try {
+          const userData = JSON.parse(userStr);
+          setCurrentUser(userData);
+        } catch (e) {
+          // JSON parse hatası - geçersiz kullanıcı verisi
+          console.error('Geçersiz kullanıcı verisi:', e);
+          localStorage.removeItem(UserService.CURRENT_USER_STORAGE_KEY);
+          setCurrentUser(null);
         }
-      } catch (error) {
-        console.error('Supabase bağlantı kontrolü sırasında hata:', error);
-        setSupabaseConnected(false);
+      } else {
+        setCurrentUser(null);
       }
-    };
-    
-    // Kullanıcı bilgilerini yükle
-    const loadUser = async () => {
+    } catch (error) {
+      console.error('Kullanıcı yükleme hatası:', error);
+      setCurrentUser(null);
+    }
+  };
+
+  // Supabase bağlantısını kontrol et
+  const checkSupabaseConnection = async () => {
+    try {
+      const result = await testSupabaseConnection();
+      if (result === false) {
+        setConnectionError('Veritabanı bağlantısı kurulamadı');
+        return { success: false, error: 'Veritabanı bağlantısı kurulamadı' };
+      }
+      return { success: true, error: null };
+    } catch (error: any) {
+      console.error('Supabase bağlantı hatası:', error);
+      setConnectionError(error.message || 'Veritabanı bağlantı hatası');
+      return { success: false, error: error.message };
+    }
+  };
+
+  // Sayfa yüklendiğinde Supabase bağlantısını kontrol et ve kullanıcı bilgilerini yükle
+  useEffect(() => {
+    const initApp = async () => {
       try {
+        // Önce Supabase bağlantısını kontrol et
         await checkSupabaseConnection();
-        const user = UserService.getCurrentUser();
-        setCurrentUser(user);
         
-        // Kullanıcı giriş yapmamışsa ve korumalı bir sayfada değilse
-        if (!user && !isPublicRoute(location.pathname)) {
-          navigate('/login', { replace: true });
-        }
-      } catch (error) {
-        console.error('Kullanıcı bilgileri yüklenirken hata:', error);
+        // Kullanıcı bilgilerini yükle
+        await loadUser();
+      } catch (err: any) {
+        console.error('Uygulama başlatılırken hata:', err);
+        setError(err?.message || 'Uygulama başlatılırken beklenmeyen bir hata oluştu');
       } finally {
         setLoading(false);
       }
     };
 
-    loadUser();
-
+    initApp();
+  }, []);
+  
+  useEffect(() => {
     // Tema tercihini localStorage'dan al
     const savedTheme = localStorage.getItem('darkMode');
     if (savedTheme) {
       setDarkMode(savedTheme === 'true');
     }
-  }, [navigate, location]);
+  }, []);
 
   // Genel erişime açık rotaları kontrol et
   const isPublicRoute = (path: string) => {
@@ -188,6 +216,7 @@ function AppContent() {
   // Tema değiştirme işlemi
   const handleThemeToggle = () => {
     setDarkMode(!darkMode);
+    localStorage.setItem('darkMode', (!darkMode).toString());
   };
 
   // Yükleniyor durumu
@@ -204,17 +233,29 @@ function AppContent() {
       </ThemeProvider>
     );
   }
-
-  // Yükleniyor durumu
-  if (loading) {
+  
+  // Bağlantı hatası varsa
+  if (connectionError) {
     return (
       <ThemeProvider theme={lightTheme}>
         <CssBaseline />
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-          <CircularProgress />
-          <Typography variant="h6" sx={{ ml: 2 }}>
-            ERP Hybrid yükleniyor...
-          </Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', flexDirection: 'column', p: 3 }}>
+          <Paper elevation={3} sx={{ p: 4, maxWidth: 600, width: '100%', textAlign: 'center' }}>
+            <Typography variant="h5" color="error" gutterBottom>
+              Veritabanı Bağlantı Hatası
+            </Typography>
+            <Alert severity="error" sx={{ my: 2, textAlign: 'left' }}>
+              {connectionError}
+            </Alert>
+            <Button 
+              variant="contained" 
+              color="primary" 
+              onClick={() => window.location.reload()}
+              sx={{ mt: 2 }}
+            >
+              YENİDEN DENE
+            </Button>
+          </Paper>
         </Box>
       </ThemeProvider>
     );
@@ -294,6 +335,8 @@ function AppContent() {
     </ThemeProvider>
   );
 }
+
+
 
 // Ana uygulama bileşeni
 export default function App() {

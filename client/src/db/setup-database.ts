@@ -1,5 +1,6 @@
 // Veritabanı kurulum ve test verisi oluşturma scripti
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import bcrypt from 'bcryptjs';
 
 // Supabase bağlantı bilgileri
 const PROJECT_ID = 'moeiyqdkstvohvhdqipt';
@@ -211,10 +212,17 @@ const addTestUsers = async (): Promise<string[]> => {
         console.log(`Kullanıcı zaten mevcut: ${user.email}, ID: ${existingUser.id}`);
         userIds.push(existingUser.id);
       } else {
+        // Şifreyi hash'le
+        const hashedPassword = await bcrypt.hash(user.password, 10);
+        const userWithHashedPassword = {
+          ...user,
+          password: hashedPassword
+        };
+        
         // Yeni kullanıcı ekle
         const { data: newUser, error: insertError } = await supabase
           .from('users')
-          .insert([user])
+          .insert([userWithHashedPassword])
           .select();
           
         if (insertError) {

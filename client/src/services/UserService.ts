@@ -363,8 +363,15 @@ export const loginUser = async (email: string, password: string): Promise<{ succ
       
       const user = data as User;
       
-      // Şifre kontrolü (gerçek uygulamada hash karşılaştırması yapılır)
-      if (user.password !== password) {
+      // Şifre kontrolü - bcrypt ile hash karşılaştırması
+      // user.password undefined olabilir, bu yüzden kontrol ekliyoruz
+      if (!user.password) {
+        console.error('UserService: Kullanıcı şifresi bulunamadı');
+        return { success: false, message: 'Geçersiz e-posta veya şifre' };
+      }
+      
+      const passwordMatch = await bcrypt.compare(password, user.password);
+      if (!passwordMatch) {
         console.error('UserService: Geçersiz şifre');
         
         // Başarısız giriş sayısını artır
